@@ -45,18 +45,15 @@ class ShortStack {
   }
   // Create all the tables needs for the models and documentmodels...
   public static function InitializeDatabase() {
-    echo "Init DB...\n";
     $modelnames = ShortStack::LoadAllModels();
     $needDocInit = false;
     foreach($modelnames as $modelName) {
       $mdl = new $modelName;
       if($mdl instanceof Model) {
-        echo "Is Model...\n";
         $res = $mdl->_createTableForModel();
         $res->execute();
       
       } else if($mdl instanceof DocumentModel) {
-        echo "Is DocumentModel...\n";
         $res = $mdl->_defineDocumentFromModel();
         $needDocInit = true;
       }
