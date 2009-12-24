@@ -25,7 +25,7 @@ include('test_helper.php');
 // ));
 
 
-$qry = Document::Find('Post')->where('author')->eq('matt')->order('slug');
+$qry = doc('Post')->where('author')->eq('matt')->order('slug');
 //$posts = $qry->fetch();
 
 if($qry->count() == 0) {

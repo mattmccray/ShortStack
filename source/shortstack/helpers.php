@@ -41,3 +41,12 @@ function use_helper($helper) {
 function getBaseUri() { // Used by the Dispatcher
 	return str_replace("/".$_SERVER['QUERY_STRING'], "/", array_shift(explode("?", $_SERVER['REQUEST_URI'])));
 }
+
+function doc($doctype, $id=null) {// For use with documents
+  if($id != null) {
+    return Document::Get($doctype, $id);
+  } else {
+    return Document::Find($doctype);
+  }
+}
+

@@ -123,6 +123,15 @@ function getBaseUri() { // Used by the Dispatcher
 	return str_replace("/".$_SERVER['QUERY_STRING'], "/", array_shift(explode("?", $_SERVER['REQUEST_URI'])));
 }
 
+function doc($doctype, $id=null) {// For use with documents
+  if($id != null) {
+    return Document::Get($doctype, $id);
+  } else {
+    return Document::Find($doctype);
+  }
+}
+
+
 class Dispatcher {
   static public $dispatched = false;
   static public $current = null;
@@ -859,31 +868,24 @@ class DocumentMatcher {
   public function eq($value) {
     return $this->finder->_addFilter($this->index, '=', $value, $this->clause);
   }
-
   public function neq($value) {
     return  $this->finder->_addFilter($this->index, '!=', $value, $this->clause);
   }
-
   public function gt($value) {
     return $this->finder->_addFilter($this->index, '>', $value, $this->clause);
   }
-
   public function lt($value) {
     return $this->finder->_addFilter($this->index, '<', $value, $this->clause);
   }
-
   public function gte($value) {
     return $this->finder->_addFilter($this->index, '>=', $value, $this->clause);
   }
-
   public function lte($value) {
     return $this->finder->_addFilter($this->index, '<=', $value, $this->clause);
   }
-
   public function like($value) {
     return $this->finder->_addFilter($this->index, 'like', $value, $this->clause);
   }
-
   public function in($value) {
     return $this->finder->_addFilter($this->index, 'in', $value, $this->clause);
   }
