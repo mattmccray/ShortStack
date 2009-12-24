@@ -24,7 +24,12 @@ Define the doctype (classname) and any indexes for querying/ordering by:
       );
       
       protected function beforeCreate() {
-        $this->slug = slugify($this->title);
+        if($this->has('title'))
+          $this->slug = slugify($this->title);
+      }
+      protected function beforeSave() {
+        if($this->hasChanged('body_src'));
+          $this->body = markdown($this->body_src);
       }
     }
 
@@ -39,7 +44,7 @@ Create a Post:
     $post = new Post();
     $post->update(array(
       'title' => 'Hello World!'
-      'body' => "I'm the post body.",
+      'body_src' => "I'm the post body!",
       'author' => "M@",
       'publish_date' => 123456789,
     ));
@@ -47,12 +52,12 @@ Create a Post:
 
 Get Post With ID of 1:
 
-    $post = Document::Get('Post', 1);
+    $post = doc('Post', 1);
 
 
 Query Posts:
 
-    $posts = Document::Find('Post')->where('author')->eq('M@')->order('publish_date', 'desc');
+    $posts = doc('Post')->where('author')->eq('M@')->order('publish_date', 'desc');
     
     foreach($posts as $post) {
       echo $post->title;
@@ -62,7 +67,7 @@ Query Posts:
 
 Update Post:
 
-    $post = Document::Get('Post', 1);
+    $post = doc('Post', 1);
     $post->update(array(
       'any_key_you_like' => "It won't matter"
     ));
@@ -70,7 +75,7 @@ Update Post:
 
 Bulk Update Posts:
     
-    Document::Find('Post')->where('author')->eq('M@')->update(array(
+    doc('Post')->where('author')->eq('M@')->update(array(
       'author' => 'M@ McCray'
     ));
 
@@ -78,14 +83,15 @@ Bulk Update Posts:
 Destroy Post:
 
     $post->destroy();
-    // Or
-    Document::Destory('Post', 1);
+    doc('Post', 1)->destroy()
+    Document::Destroy('Post', 1);
 
 Bulk Destroy Posts -- Kinda dangerous:
 
-    Document::Find('Post')->where('author')->neq('M@')->destroy();
+    doc('Post')->where('author')->neq('M@')->destroy();
 
 Coming soon: Relationships `hasMany` and `belongsTo`.
+
 
 ## Todos
 
