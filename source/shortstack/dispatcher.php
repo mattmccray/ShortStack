@@ -1,7 +1,5 @@
 <?php
 
-// = Dispatcher =
-
 class Dispatcher {
   static public $dispatched = false;
   static public $current = null;

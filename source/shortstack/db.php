@@ -1,7 +1,5 @@
 <?php
 
-// = DB =
-
 class DB
 {
   static protected $pdo; // Public for now...

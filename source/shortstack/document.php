@@ -2,16 +2,19 @@
  
 class Document {
   private static $_document_indexes_ = array();
-  private static $_document_callbacks_ = array();
   
-  public static function Define($name, $indexes=array(), $callbacks=array(), $createClass=true) {
-    Document::$_document_indexes_[$name] = $indexes;
-    Document::$_document_callbacks_[$name] = $callbacks;
+  public static function Register($class) {
+    $doc = new $class();
+    $doc->_defineDocumentFromModel();
+  }
+  
+  public static function Define($name, $indexes=array(), $createClass=true) {
+    Document::$_document_indexes_[$name] = array_merge($indexes, array()); // a hokey way to clone an array
     if($createClass)
       eval("class ". $name ." extends DocumentModel {  }");
   }
   
-  public static function InitalizeDatabase() {
+  public static function InitializeDatabase() {
     // Loop through all the docs and create tables and index tables...
     foreach( Document::$_document_indexes_ as $docType => $indexes) {
       $tableSQL = "CREATE TABLE IF NOT EXISTS ". $docType ." ( id INTEGER PRIMARY KEY, data TEXT, created_on TIMESTAMP, updated_on TIMESTAMP );";
@@ -27,14 +30,16 @@ class Document {
     // Loop through all the records, deserialize the data column and recreate the index rows
     $docs = array();
     // Step one: Fetch all the documents to update...
-    if($doctype != null && $id != null) {
-      $sql = "SELECT * FROM ".$doctype." WHERE id = ". $id .";";
-      $results = DB::fetchAll($sql);
-      foreach ($results as $row) {
-        $docs[] = new $doctype($row);
+    if($doctype != null) {
+      if(!array_key_exists($doctype, Document::$_document_indexes_)) {
+        $tmp = new $doctype();
+        $tmp->_defineDocumentFromModel();
       }
-    } else if( $doctype != null) {
-      $sql = "SELECT * FROM ".$doctype.";";
+      if($id != null) {
+        $sql = "SELECT * FROM ".$doctype." WHERE id = ". $id .";";
+      } else {
+        $sql = "SELECT * FROM ".$doctype.";";
+      }
       $results = DB::fetchAll($sql);
       foreach ($results as $row) {
         $docs[] = new $doctype($row);
@@ -135,7 +140,9 @@ class DocumentFinder implements IteratorAggregate {
     return $this;
   }
   
-
+  public function count() {
+    return count($this->fetch());
+  }
   
   public function get() {   // Returns the first match
     $oldLimit = $this->limit;
@@ -293,6 +300,10 @@ class DocumentModel {
   protected $hasChanged;
   protected $changedFields = array();
 
+  protected $indexes = array();
+  protected $hasMany = array();
+  protected $belongsTo = array();
+
   function __construct($dataRow=null) {
     $this->doctype = get_class($this);
     if($dataRow != null) {
@@ -322,34 +333,33 @@ class DocumentModel {
     }
   }
   
-  // function __call( $method, $args ) {
-  //   // TODO: Support relationships here...
-  //   if(array_key_exists($method, $this->hasMany)) {
-  //     return $this->_handleHasMany($method, $args);
-  //   }
-  //   else if(array_key_exists($method, $this->belongsTo)) {
-  //     return $this->_handleBelongsTo($method, $args);
-  //   }
-  //   // look for 'add'+hasManyName
-  //   // look for 'set'+belongsToName
-  //   else {
-  //     return NULL; // FIXME: What to do here?
-  //   }
-  // }
+  function __call( $method, $args ) {
+    if(array_key_exists($method, $this->hasMany)) {
+      return $this->_handleHasMany($method, $args);
+    }
+    else if(array_key_exists($method, $this->belongsTo)) {
+      return $this->_handleBelongsTo($method, $args);
+    }
+    // look for 'add'+hasManyName
+    // look for 'set'+belongsToName
+    else {
+      return NULL; // FIXME: What to do here?
+    }
+  }
   
-  // protected function _handleHasMany($method, $args) {
-  //   $def = $this->hasMany[$method];
-  //   $mdlClass = $def['doctype'];
-  //   $fk = strtolower($this->doctype)."_id";
-  //   return Document::Find($mdlClass)->where($fk)->eq($this->id)->get();
-  // }
-  // 
-  // protected function _handleBelongsTo($method, $args) {
-  //   $def = $this->hasMany[$method];
-  //   $mdlClass = $def['doctype'];
-  //   $fk = strtolower($mdlClass)."_id";
-  //   return Document::Find($mdlClass)->where('id')->eq($this->$fk).get();
-  // }
+  protected function _handleHasMany($method, $args) {
+    $def = $this->hasMany[$method];
+    $mdlClass = $def['doctype'];
+    $fk = strtolower($this->doctype)."_id";
+    return Document::Find($mdlClass)->where($fk)->eq($this->id)->get();
+  }
+  
+  protected function _handleBelongsTo($method, $args) {
+    $def = $this->hasMany[$method];
+    $mdlClass = $def['doctype'];
+    $fk = strtolower($mdlClass)."_id";
+    return Document::Find($mdlClass)->where('id')->eq($this->$fk).get();
+  }
   
   public function updateValues($values=array()) {
     return $this->update($values);
@@ -362,42 +372,50 @@ class DocumentModel {
   }
 
   public function save() {
-    if($this->isNew) { // Insert
-      $sql = 'INSERT INTO '.$this->doctype.' ( data ) VALUES ( "'.htmlentities( json_encode($this->data), ENT_QUOTES).'" );';
-      $statement = DB::query($sql);
-      $result = DB::query('SELECT last_insert_rowid() as last_insert_rowid')->fetch(); // Get the record's generated ID...
-      $this->id = $result['last_insert_rowid'];
-      Document::Reindex($this->doctype, $this->id);
-    } else { // Update
-      if($this->hasChanged) {
+    if($this->hasChanged) {
+      $this->beforeSave(); // Cannot cancel events... yet.
+      if($this->isNew) { // Insert
+        $this->beforeCreate(); // Cannot cancel events... yet.
+        $sql = 'INSERT INTO '.$this->doctype.' ( data ) VALUES ( "'.htmlentities( json_encode($this->data), ENT_QUOTES).'" );';
+        $statement = DB::query($sql);
+        $result = DB::query('SELECT last_insert_rowid() as last_insert_rowid')->fetch(); // Get the record's generated ID...
+        $this->id = $result['last_insert_rowid'];
+        Document::Reindex($this->doctype, $this->id);
+        $this->afterCreate(); // Cannot cancel events... yet.
+      } else { // Update
         $sql = "UPDATE ".$this->doctype.' SET data="'.htmlentities( json_encode($this->data), ENT_QUOTES).'" WHERE id = '. $this->id .';';
         $statement = DB::query($sql);
         $index_changed = array_intersect($this->changedFields, array_keys(Document::GetIndexesFor($this->doctype)));
         if(count($index_changed) > 0)  // Only if an indexed field has changed
           Document::Reindex($this->doctype, $this->id);
       }
+      $this->changedFields = array();
+      $this->hasChanged = false;
+      $this->isNew = false;
+      $this->afterSave(); // Cannot cancel events... yet.
     }
-    $this->changedFields = array();
-    $this->hasChanged = false;
-    $this->isNew = false;
     return $this;
   }
   
-  //TODO: Before Save, After Save, Before Create, After Create, Before Destroy, After Destroy
+  //Callbacks for Before Save, After Save, Before Create, After Create, Before Destroy, After Destroy
+  protected function beforeSave() {}
+  protected function afterSave() {}
+  protected function beforeCreate() {}
+  protected function afterCreate() {}
+  protected function beforeDestroy() {}
+  protected function afterDestroy() {}
 
   // Warning: Like Han solo, this method doesn't fuck around, it will shoot first.
   public function destroy() {
+    $this->beforeDestroy(); // Cannot cancel events... yet.
     Document::Destroy($this->doctype, $this->id);
+    $this->afterDestroy(); // Cannot cancel events... yet.
     return $this;
   }
-
-  // protected function getChangedValues() {
-  //   $results = array();
-  //   foreach($this->changedFields as $key=>$fieldname) {
-  //     $results[$fieldname] = '"'.htmlentities($this->$fieldname, ENT_QUOTES).'"';
-  //   }
-  //   return $results;
-  // }
+  
+  public function _defineDocumentFromModel() {
+    Document::Define( $this->doctype, $this->indexes, false);
+  }
   
   public function to_array($exclude=array()) {
     $attrs = array( 'id'=>$this->id );

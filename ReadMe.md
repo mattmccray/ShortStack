@@ -14,26 +14,31 @@ A simple, easily customized, MVC framework for PHP. Currently built for use with
 
 Still very early, but here are some usage examples...
     
-Define the doctype and any indexes for querying/ordering by:
+Define the doctype (classname) and any indexes for querying/ordering by:
 
-    Document::Define('Post', array(
-      'slug' => 'INTEGER',
-      'author' => 'STRING',
-      'publish_date' => 'TIMESTAMP'
-    ));
+    class Post extends DocumentModel {
+      protected $indexes = array(
+        'slug' => 'TEXT',
+        'author' => 'TEXT',
+        'publish_date' => 'TIMESTAMP'
+      );
+      
+      protected function beforeCreate() {
+        $this->slug = slugify($this->title);
+      }
+    }
 
 
 Initialize the DB (if you've created new documents/indexes):
 
-    Document::InitializeDatabase();
+    ShortStack::InitializeDatabase();
 
 
 Create a Post:
 
     $post = new Post();
     $post->update(array(
-      'title' => 'Hello World!',
-      'slug' => 'hello-world',
+      'title' => 'Hello World!'
       'body' => "I'm the post body.",
       'author' => "M@",
       'publish_date' => 123456789,
@@ -78,9 +83,8 @@ Destroy Post:
 
 Bulk Destroy Posts -- Kinda dangerous:
 
-
     Document::Find('Post')->where('author')->neq('M@')->destroy();
 
-Coming soon: Better Document Class support, callbacks, `hasMany` and `belongsTo`.
+Coming soon: Relationships `hasMany` and `belongsTo`.
 
 

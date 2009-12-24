@@ -1,7 +1,5 @@
 <?php
 
-// = Template =
-
 class Template {
   
   private $path;

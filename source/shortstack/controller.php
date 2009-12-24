@@ -1,7 +1,5 @@
 <?php
 
-// = Controller =
-
 class Controller {
   protected $defaultLayout = "_layout";
   

@@ -1,7 +1,5 @@
 <?php
 
-// = Model =
-
 class Model {
 
     protected $data;
@@ -142,9 +140,7 @@ class Model {
       return Model::toJSON( $this->to_array($exclude) );
     }
     
-    
     // = SQL Builder Helper Methods =
-
     public function _createTableForModel() {
       return self::CreateTableForModel($this->modelName, $this);
     }
@@ -195,7 +191,6 @@ class Model {
         $mdl = new $className();
         if(isset($mdl->defaultOrderBy)) {
           $sql .= " ORDER BY ".$mdl->defaultOrderBy." ";
-//          echo $sql;
         }
       }
       if($sqlPostfix != '') {
@@ -238,7 +233,6 @@ class Model {
     }
     
     // = Static methods / variables =    
-    
     static public function toJSON($obj) {
       if(is_array($obj)) {
         $data = array();

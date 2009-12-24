@@ -2,21 +2,11 @@
 
 include('test_helper.php');
 
-Document::Define('Post', array(
-  'slug' => 'TEXT',
-  'author' => 'TEXT',
-  'publish_date' => 'TIMESTAMP',
-  'position' => 'INTEGER'
-));
-
-Document::InitalizeDatabase();
-
 
 // $post = new Post();
 // 
 // $post->updateValues(array(
 //   'title' => 'Hello World',
-//   'slug' => 'hello-world',
 //   'author' => 'matt',
 //   'body' => 'Hello world, how are you?!',
 //   'publish_date' => time(),
@@ -24,8 +14,8 @@ Document::InitalizeDatabase();
 // ));
 // 
 // $post->save();
-// // 
-// print_r($post);
+// 
+//print_r($post->slug);
 
 
 //print_r(Document::Find('Post')->fetch());
@@ -35,12 +25,28 @@ Document::InitalizeDatabase();
 // ));
 
 
-$qry = Document::Find('Post')->where('author')->neq('matt')->order('slug');
+$qry = Document::Find('Post')->where('author')->eq('matt')->order('slug');
 //$posts = $qry->fetch();
+
+if($qry->count() == 0) {
+  for ($i=0; $i < 6; $i++) { 
+    $post = new Post();
+    
+    $post->updateValues(array(
+      'title' => 'Hello World ('. $i .')',
+      'author' => 'matt',
+      'body' => 'Hello world, how are you?!',
+      'publish_date' => time(),
+      'position' => $i
+    ));
+    
+    $post->save();
+  }
+}
 
 //$qry->destroy();
 
-echo "\n\n".count($qry) ." posts by matt\n";
+echo "\n\n".$qry->count() ." posts by matt\n";
 
 foreach ($qry as $post) {
 //  print_r($post);
@@ -48,7 +54,7 @@ foreach ($qry as $post) {
 }
 
 
-$p2 = Document::Get('Post', 2);
+//$p2 = Document::Get('Post', 2);
 
 //print_r($p2);
 

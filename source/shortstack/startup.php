@@ -1,7 +1,5 @@
 <?php
 
-// = Startup =
-
 if( isset($shortstack_config) ) {
   if(@ is_array($shortstack_config['helpers']['autoload']) ) {
     foreach($shortstack_config['helpers']['autoload'] as $helper) {
@@ -18,7 +16,3 @@ if( isset($shortstack_config) ) {
 } else {
   throw new NotFoundException("ShortStack configuration missing!");
 }
-
-//echo "<pre>";
-//print_r($_SERVER);
-//echo "</pre>";

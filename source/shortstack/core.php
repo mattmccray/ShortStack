@@ -1,7 +1,5 @@
 <?php
 
-// = Autoloader =
-
 function __autoload($className) {
   $classPath = ShortStack::AutoLoadFinder($className);
   if(!file_exists($classPath)) {
@@ -11,14 +9,10 @@ function __autoload($className) {
   }
 }
 
-// = Exceptions =
-
 class Redirect extends Exception { }
 class FullRedirect extends Exception { }
 class EmptyDbException extends Exception { }
 class NotFoundException extends Exception { }
-
-// = ShortStack Core =
 
 class ShortStack {
   public static function AutoLoadFinder($className) {
@@ -43,6 +37,27 @@ class ShortStack {
       $classNames[] = camelize($className);
     }
     return $classNames;    
+  }
+  // Create all the tables needs for the models and documentmodels...
+  public static function InitializeDatabase() {
+    echo "Init DB...\n";
+    $modelnames = ShortStack::LoadAllModels();
+    $needDocInit = false;
+    foreach($modelnames as $modelName) {
+      $mdl = new $modelName;
+      if($mdl instanceof Model) {
+        echo "Is Model...\n";
+        $res = $mdl->_createTableForModel();
+        $res->execute();
+      
+      } else if($mdl instanceof DocumentModel) {
+        echo "Is DocumentModel...\n";
+        $res = $mdl->_defineDocumentFromModel();
+        $needDocInit = true;
+      }
+    }
+    if($needDocInit) Document::InitializeDatabase();
+    return $modelnames;
   }
   // File paths...
   public static function viewPath($path) {

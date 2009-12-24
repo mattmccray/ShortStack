@@ -1,7 +1,5 @@
 <?php
 
-// = Helpers =
-
 function url_for($controller) {
   return BASEURI . $controller;
 }
@@ -40,7 +38,6 @@ function use_helper($helper) {
   require_once( ShortStack::helperPath($helper) );
 }
 
-// Used by the Dispatcher
-function getBaseUri() {
+function getBaseUri() { // Used by the Dispatcher
 	return str_replace("/".$_SERVER['QUERY_STRING'], "/", array_shift(explode("?", $_SERVER['REQUEST_URI'])));
 }

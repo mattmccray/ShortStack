@@ -55,19 +55,8 @@ try {
   include('../source/shortstack-dev.php');
 } catch (EmptyDbException $e) {
 
-  foreach(ShortStack::LoadAllModels() as $modelName) {
-    $mdl = new $modelName;
-    if($mdl instanceof Model) {
-      $res = $mdl->_createTableForModel();
-      if( $res->execute() == "" )
-        echo $modelName ." Created\n";
-      else
-        echo $modelName ." Already exists\n";
-    }
-  }
+  ShortStack::InitializeDatabase();
   echo "Models loaded...\n";
-  Document::InitalizeDatabase();
-  echo "Documents loaded...\n";
 }
 
 
