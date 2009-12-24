@@ -1,18 +1,14 @@
 <?php
 
-class Post extends DocumentModel {
+class Comment extends DocumentModel {
   $indexes = array(
-    'slug'         => 'STRING',
+    'post_id'      => 'INTEGER',
     'author'       => 'STRING',
     'publish_date' => 'TIMESTAMP',
   );
-  $hasMany = array(
-    'doctype'=>'Comment'
+  $belongsTo = array(
+    'doctype'=>'Post'
   );
-
-  protected beforeCreate() {
-    $this->slug = slugify($this->title);
-  }
   
   protected beforeSave() {
     if( $this->hasChanged('body_src') ){

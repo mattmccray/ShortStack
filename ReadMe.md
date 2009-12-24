@@ -87,4 +87,8 @@ Bulk Destroy Posts -- Kinda dangerous:
 
 Coming soon: Relationships `hasMany` and `belongsTo`.
 
+## Todos
+
+* Use PDO prepared statements where possible?
+* Better error handling.
 

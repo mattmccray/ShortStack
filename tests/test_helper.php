@@ -27,7 +27,7 @@ date_default_timezone_set('America/Chicago');
 $config['shortstack'] = array(
   'db' => array(
     'engine'   => 'sqlite', // Only one supported as yet
-    'database' => 'test-db.sqlite3',
+    'database' => 'db.test.sqlite3',
     'autoconnect' => true,
     'verify' => true,
   ),

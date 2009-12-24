@@ -44,8 +44,6 @@ if($qry->count() == 0) {
   }
 }
 
-//$qry->destroy();
-
 echo "\n\n".$qry->count() ." posts by matt\n";
 
 foreach ($qry as $post) {
@@ -72,6 +70,8 @@ foreach ($qry as $post) {
 // echo $pst->author ." <<<\n";
 // 
 // print_r($pst);
+
+//Document::Find('Post')->destroy();
 
 echo "\n\nDone with test.\n";
 

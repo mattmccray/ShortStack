@@ -58,6 +58,7 @@ class Document {
     foreach ($docs as $doc) {
       $indexes = Document::GetIndexesFor($doc->doctype);
       foreach ($indexes as $field=>$fType) {
+        // TODO: Optimize as single transactions?
         $indexTable = $doc->doctype ."_". $field ."_idx";
         $sql = "DELETE FROM ". $indexTable ." WHERE docid = ". $doc->id .";";
         $results = DB::query($sql);
@@ -319,18 +320,23 @@ class DocumentModel {
   }
 
   function __get($key) {
-    if(!$this->data) { $this->data = json_decode(html_entity_decode($this->rawData, ENT_QUOTES)); }
-    return $this->data->{$key}; //html_entity_decode($this->data[$key], ENT_QUOTES );
+    if(!$this->data) { $this->_deserialize(); }
+    return $this->data[$key]; //html_entity_decode($this->data[$key], ENT_QUOTES );
   }
 
   function __set($key, $value) {
-    if(!$this->data) { $this->data = json_decode(html_entity_decode($this->rawData, ENT_QUOTES)); }
+    if(!$this->data) { $this->_deserialize(); }
     $value = stripslashes($value);
-    if(@ $this->data->{$key} != $value){ //htmlentities($value, ENT_QUOTES)) {
-      $this->data->{$key} = $value;
+    if(@ $this->data[$key] != $value){ //htmlentities($value, ENT_QUOTES)) {
+      $this->data[$key] = $value;
       $this->changedFields[] = $key;
       $this->hasChanged = true;
     }
+  }
+  
+  public function has($key) {
+    if(!$this->data) $this->_deserialize();
+    return array_key_exists($key, $this->data);
   }
   
   function __call( $method, $args ) {
@@ -370,19 +376,24 @@ class DocumentModel {
     }
     return $this;
   }
+  public function hasChanged($key) {
+    return in_array($key, $this->changedFields);
+  }
 
   public function save() {
     if($this->hasChanged) {
       $this->beforeSave(); // Cannot cancel events... yet.
       if($this->isNew) { // Insert
         $this->beforeCreate(); // Cannot cancel events... yet.
-        $sql = 'INSERT INTO '.$this->doctype.' ( data ) VALUES ( "'.htmlentities( json_encode($this->data), ENT_QUOTES).'" );';
+        $this->_serialize();
+        $sql = 'INSERT INTO '.$this->doctype.' ( data ) VALUES ( "'. $this->rawData .'" );';
         $statement = DB::query($sql);
         $result = DB::query('SELECT last_insert_rowid() as last_insert_rowid')->fetch(); // Get the record's generated ID...
         $this->id = $result['last_insert_rowid'];
         Document::Reindex($this->doctype, $this->id);
         $this->afterCreate(); // Cannot cancel events... yet.
       } else { // Update
+        $this->serialize();
         $sql = "UPDATE ".$this->doctype.' SET data="'.htmlentities( json_encode($this->data), ENT_QUOTES).'" WHERE id = '. $this->id .';';
         $statement = DB::query($sql);
         $index_changed = array_intersect($this->changedFields, array_keys(Document::GetIndexesFor($this->doctype)));
@@ -397,13 +408,17 @@ class DocumentModel {
     return $this;
   }
   
-  //Callbacks for Before Save, After Save, Before Create, After Create, Before Destroy, After Destroy
+  // Callbacks
   protected function beforeSave() {}
   protected function afterSave() {}
   protected function beforeCreate() {}
   protected function afterCreate() {}
   protected function beforeDestroy() {}
   protected function afterDestroy() {}
+  protected function beforeSerialize() {}
+  protected function afterSerialize() {}
+  protected function beforeDeserialize() {}
+  protected function afterDeserialize() {}
 
   // Warning: Like Han solo, this method doesn't fuck around, it will shoot first.
   public function destroy() {
@@ -415,6 +430,28 @@ class DocumentModel {
   
   public function _defineDocumentFromModel() {
     Document::Define( $this->doctype, $this->indexes, false);
+  }
+  
+  // If you'd rather store the data as something else (XML, say) you can override these methods
+  protected function deserialize($source) { // Must return an associative array
+    return json_decode($source, true);
+  }
+  protected function serialize($source) { // Must return a string
+    return json_encode($source);
+  }
+
+  // Used internally only... Triggers callbacks.
+  private function _serialize() {
+    $this->beforeSerialize();
+    $this->rawData = htmlentities( $this->serialize( $this->data ), ENT_QUOTES );
+    $this->afterSerialize(); // ??: Should the results be passed in to allow massaging?
+    return $this;
+  }
+  private function _deserialize() {
+    $this->beforeDeserialize();
+    $this->data = $this->deserialize( html_entity_decode($this->rawData, ENT_QUOTES) );
+    $this->afterDeserialize(); // ??: Should the results be passed in to allow massaging?
+    return $this;
   }
   
   public function to_array($exclude=array()) {

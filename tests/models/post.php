@@ -2,13 +2,22 @@
 
 class Post extends DocumentModel {
   protected $indexes = array(
-    'slug' => 'TEXT',
-    'author' => 'TEXT',
+    'slug'         => 'STRING',
+    'author'       => 'STRING',
     'publish_date' => 'TIMESTAMP',
-    'position' => 'INTEGER'
   );
-  
+  protected $hasMany = array(
+    'doctype'=>'Comment'
+  );
+
   protected function beforeCreate() {
-    $this->slug = slugify($this->title);
+    if($this->has('title'))
+      $this->slug = slugify($this->title);
+  }
+  
+  protected function beforeSave() {
+    if( $this->hasChanged('body_src') ){
+      $this->body = markdown($this->body_src);
+    }
   }
 }
