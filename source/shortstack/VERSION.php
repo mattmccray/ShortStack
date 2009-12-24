@@ -1,6 +1,6 @@
 <?php
  
-// ShortStack v0.8.1
+// ShortStack v0.9
 // By M@ McCray
 // http://github.com/darthapo/ShortStack
 

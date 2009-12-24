@@ -3,7 +3,7 @@ desc "Compile the source into dist/shortstack.php"
 task :compile do
   compiled_src = "<?php\n"
   
-  %w(VERSION core helpers dispatcher controller db model template startup).each do |src_file|
+  %w(VERSION core helpers dispatcher controller db model document template startup).each do |src_file|
     frag_src = IO.readlines("source/shortstack/#{src_file}.php")
     frag_src.shift
     compiled_src += frag_src.join('')
