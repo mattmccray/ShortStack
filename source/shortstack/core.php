@@ -69,6 +69,9 @@ class ShortStack {
   public static function HelperPath($path) {
     return self::GetPathFor('helpers', $path);
   }
+  public static function CachePath($path) {
+    return self::GetPathFor('cacheing', $path);
+  }
   protected static function GetPathFor($type, $path) {
     global $shortstack_config;
     return $shortstack_config[$type]['folder']."/".$path.".php";

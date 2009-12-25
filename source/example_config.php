@@ -6,23 +6,28 @@
 $shortstack_config = array(
   'db' => array(
     'engine'   => 'sqlite', // Only one supported as yet
-    'database' => 'test-db.sqlite3',
+    'database' => 'app/data/db.sqlite3',
     'autoconnect' => true,
     'verify' => true,
   ),
   'models' => array(
-    'folder' => 'comicus/app/models',
+    'folder' => 'app/models',
   ),
   'views' => array(
-    'folder' => 'comicus/app/views',
+    'folder' => 'app/views',
     'force_short_tags'=>false,
   ),
   'controllers' => array(
-    'folder' => 'comicus/app/controllers',
+    'folder' => 'app/controllers',
+    'index' => 'home',
     '404_handler'=>'home',
   ),
   'helpers' => array(
-    'folder' => 'comicus/app/helpers',
+    'folder' => 'app/helpers',
     'autoload'=> array('link', 'navigation'),
+  ),
+  'cacheing' => array(
+    'folder' => 'caches',
+    'enabled' => true,
   ),
 );

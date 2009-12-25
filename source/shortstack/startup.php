@@ -13,22 +13,27 @@ if(!isset($shortstack_config)) {
     ),
     'views' => array(
       'folder' => 'views',
-      'cache' => 'caches',
       'force_short_tags'=>false,
     ),
     'controllers' => array(
       'folder' => 'controllers',
+      'index' => 'home',
       '404_handler'=>'home',
     ),
     'helpers' => array(
       'folder' => 'helpers',
       'autoload'=> array(),
     ),
+    'cacheing' => array(
+      'folder' => 'caches',
+      'enabled' => true,
+    ),
   );
 }
 
 if( isset($shortstack_config) ) {
   define('FORCESHORTTAGS', @$shortstack_config['views']['force_short_tags']);
+  define('USECACHE', @$shortstack_config['cacheing']['enabled']);
   if(@ is_array($shortstack_config['helpers']['autoload']) ) {
     foreach($shortstack_config['helpers']['autoload'] as $helper) {
       require_once( ShortStack::HelperPath($helper."_helper"));

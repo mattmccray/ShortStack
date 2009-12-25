@@ -2,10 +2,14 @@
 
 class Controller {
   protected $defaultLayout = "_layout";
+  protected $cacheName = false;
+  protected $cacheOutput = true;
   
   // Default execute method... Feel free to override.
   function execute($args=array()) {
+    $this->cacheName = get_class($this)."-".join('_', $args);
     if(@ $this->secure) $this->ensureLoggedIn();
+    $this->_preferCached();
     $this->dispatchAction($args);
   }
   
@@ -21,14 +25,16 @@ class Controller {
   
   function renderText($text, $params=array(), $wrapInLayout=null) {
     $layoutView = ($wrapInLayout == null) ? $this->defaultLayout : $wrapInLayout;
-    
+    $output = '';
     if($layoutView !== false) {
       $layout = new Template( ShortStack::ViewPath($layoutView) );
       $layout->contentForLayout = $text;
-      $layout->display($params);
+      $output = $layout->fetch($params);
     } else {
-      echo $text;
+      $output = $text;
     }
+    $this->_cacheContent($output);
+    echo $output;
   }
   
   // TODO: ???Should this even be here???
@@ -57,6 +63,22 @@ class Controller {
       }
   }
 
+  protected function _preferCached($name=null) {
+    if($this->cacheOutput) {
+      $cname = ($name == null) ? $this->cacheName : $name;
+      if(Cache::Exists($cname)) {
+        echo Cache::Get($cname);
+        exit(0);
+      }
+    }
+  }
+  
+  protected function _cacheContent($content, $name=null) {
+    if($this->cacheOutput) {
+      $cname = ($name == null) ? $this->cacheName : $name;
+      Cache::Save($cname, $content);
+    }
+  }
   
   protected function ensureLoggedIn($useHTTP=false) {
     if (!$this->isLoggedIn()) {
@@ -121,5 +143,17 @@ class Controller {
       $this->index($path_segments);
     }
   }
-  
+ 
+ // Static methods
+ private static $blacklisted_controllers = array();
+ 
+ public static function Blacklist() {
+   foreach (func_get_args() as $controller) {
+    self::$blacklisted_controllers[] = $controller;
+   }
+ }
+ 
+ public static function IsAllowed($controller) {
+   return !in_array($controller, self::$blacklisted_controllers);
+ }
 }

@@ -23,7 +23,6 @@ $config['shortstack'] = array(
   'views' => array(
     'folder' => 'app/views',
     'force_short_tags' => false,
-    'cache_folder' => 'app/views/_cache'
   ),
   'controllers' => array(
     'folder' => 'app/controllers',
@@ -32,5 +31,9 @@ $config['shortstack'] = array(
   'helpers' => array(
     'folder' => 'app/helpers',
     'autoload'=> array(),
+  ),
+  'cacheing' => array(
+    'folder' => 'caches',
+    'enabled' => true,
   ),
 );

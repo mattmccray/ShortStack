@@ -1,6 +1,6 @@
 Options -Indexes
 
-# php_flag display_errors off
+php_flag display_errors on
 
 # Turn on URL rewriting
 RewriteEngine On
@@ -9,7 +9,10 @@ RewriteEngine On
 RewriteBase /
 
 # Protect application files from being viewed
-RewriteRule ^(app) - [F,L]
+RewriteRule ^(.git|application) - [F,L]
+
+# Don't want template file evaluated directly in browser
+RewriteRule ^themes/(.*).php - [F,L]
 
 # Allow any files or directories that exist to be displayed directly
 RewriteCond %{REQUEST_FILENAME} !-f

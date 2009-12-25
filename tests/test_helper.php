@@ -41,10 +41,15 @@ $config['shortstack'] = array(
   'controllers' => array(
     'folder' => 'controllers',
     '404_handler'=>'home',
+    'index' => 'home',
   ),
   'helpers' => array(
     'folder' => 'helpers',
     'autoload'=> array(),
+  ),
+  'cacheing' => array(
+    'folder' => 'caches',
+    'enabled' => true, // False?
   ),
 );
 

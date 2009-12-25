@@ -15,7 +15,9 @@ class Dispatcher {
     // override is mainly only used for an 'install' controller... I'd imagine.
     if($override_controller != false) $controller = $override_controller;
     if($controller == '') {
-      $controller = 'home_controller'; // From settings instead?
+      global $shortstack_config;
+      $controller = @$shortstack_config['controllers']['index']; // From settings instead?
+      if(!$controller) $controller = 'home_controller'; // ?
     } else { 
       $controller = $controller.'_controller';
     }
@@ -27,6 +29,7 @@ class Dispatcher {
       $controller = self::getControllerClass($controller_name);
       self::$current = $controller;
       try {
+        if(!Controller::IsAllowed($controller_name)) throw new NotFoundException();
         $ctrl = new $controller();
         $ctrl->execute($route_data);
         self::$dispatched = true;
