@@ -3,7 +3,7 @@
 // =======================================
 // = Shortstack (MVC) Framework Settings =
 // =======================================
-$config['shortstack'] = array(
+$shortstack_config = array(
   'db' => array(
     'engine'   => 'sqlite', // Only one supported as yet
     'database' => 'test-db.sqlite3',

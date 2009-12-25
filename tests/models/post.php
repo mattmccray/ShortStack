@@ -2,13 +2,18 @@
 
 class Post extends DocumentModel {
   protected $indexes = array(
+    'user_id'      => 'INTEGER',
     'slug'         => 'STRING',
     'author'       => 'STRING',
     'publish_date' => 'TIMESTAMP',
   );
   protected $hasMany = array(
-    'doctype'=>'Comment'
+    'comments' => array('document'=>'Comment')
   );
+  protected $belongs_to = array(
+    'user' => array('model'=>'User'),
+  );
+  
 
   protected function beforeCreate() {
     if($this->has('title'))

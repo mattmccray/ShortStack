@@ -42,6 +42,7 @@ class Template {
   }
   
   function fetch($params=array()) {
+//    set_include_path($templathPath); // May be needed... Sometimes
     extract(array_merge($params, $this->context)); // Make variables local!
     ob_start();
     if (FORCESHORTTAGS) { // If the PHP installation does not support short tags we'll do a little string replacement, changing the short tags to standard PHP echo statements.

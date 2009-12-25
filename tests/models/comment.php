@@ -7,7 +7,8 @@ class Comment extends DocumentModel {
     'publish_date' => 'TIMESTAMP'
   );
   protected $belongsTo = array(
-    'doctype'=>'Post'
+    'post'=>array('document'=>'Post'),
+    'post'=>array('model'=>'User')
   );
   
   protected function beforeSave() {

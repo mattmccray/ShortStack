@@ -95,6 +95,10 @@ Coming soon: Relationships `hasMany` and `belongsTo`.
 
 ## Todos
 
+* Merge `Document` and `DocumentModel`?
+* Generic `get()` helper that figures out whether it's a doc or mdl?
 * Use PDO prepared statements where possible?
 * Better error handling.
+* Remove all the @ cruft
+* Remove all the AR-like crap from Models
 

@@ -42,11 +42,25 @@ function getBaseUri() { // Used by the Dispatcher
 	return str_replace("/".$_SERVER['QUERY_STRING'], "/", array_shift(explode("?", $_SERVER['REQUEST_URI'])));
 }
 
+function debug($obj) {
+  echo "<pre>";
+  print_r($obj);
+  echo "</pre>";
+}
+
 function doc($doctype, $id=null) {// For use with documents
   if($id != null) {
     return Document::Get($doctype, $id);
   } else {
     return Document::Find($doctype);
+  }
+}
+
+function mdl($objtype, $id=null) {// For use with documents
+  if($id != null) {
+    return Model::FindById($objtype, $id);
+  } else {
+    return new ModelFinder($doctype);
   }
 }
 
