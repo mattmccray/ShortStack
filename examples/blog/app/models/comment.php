@@ -1,6 +1,6 @@
 <?php
 
-class Comment extends DocumentModel {
+class Comment extends Document {
   $indexes = array(
     'post_id'      => 'INTEGER',
     'author'       => 'STRING',

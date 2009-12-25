@@ -84,7 +84,7 @@ class CoreModel {
       else if(array_key_exists('model', $def)) {
         $mdlClass = $def['model'];
         $fk = strtolower($mdlClass)."_id";
-        return Model::FindById($mdlClass, "id = ".$this->$fk);
+        return Model::Get($mdlClass, $this->$fk);
       } else {
         throw new Exception("A relationship has to be defined as a model or document");
       }
@@ -94,10 +94,11 @@ class CoreModel {
       foreach($values as $key=>$value) {
         $this->$key = $value;
       }
+      return $this;
     }
     
     public function update($values=array()) {
-      $this->updateValues($values);
+      return $this->updateValues($values);
     }
     
     public function hasChanged($key) {
@@ -135,6 +136,7 @@ class CoreModel {
         $fk = strtolower( get_class($modelOrName))."_id";
         $this->$fk = $modelOrName->id;
       }
+      return $this;
     }
     
     public function to_array($exclude=array()) {
@@ -182,6 +184,7 @@ class Model extends CoreModel {
     foreach($values as $key=>$value) {
       if(in_array($key, $valid_atts)) $this->$key = $value;
     }
+    return $this;
   }
   
   protected function getChangedValues() {
@@ -200,9 +203,9 @@ class Model extends CoreModel {
         $this->beforeCreate();
         $values = $this->getChangedValues();
         $sql = "INSERT INTO ".$this->modelName." (".join($this->changedFields, ', ').") VALUES (".join($values, ', ').");";
-        $statement = DB::query($sql);
+        $statement = DB::Query($sql);
         // Get the record's generated ID...
-        $result = DB::query('SELECT last_insert_rowid() as last_insert_rowid')->fetch();
+        $result = DB::Query('SELECT last_insert_rowid() as last_insert_rowid')->fetch();
         $this->data['id'] = $result['last_insert_rowid'];
         $this->afterCreate();
       } else {
@@ -213,20 +216,20 @@ class Model extends CoreModel {
           $fields[] = $field." = ".$value;
         }
         $sql = "UPDATE ".$this->modelName." SET ". join($fields, ", ") ." WHERE id = ". $this->id .";";
-        $statement = DB::query($sql);
+        $statement = DB::Query($sql);
       }
       $this->changedFields = array();
       $this->isDirty = false;
       $this->isNew = false;
       $this->afterSave();
     }
+    return $this;
   }
   
   // Warning: Like Han solo, this method doesn't fuck around, it will shoot first.
   public function destroy() {
     $this->beforeDestroy();
-    $sql = "DELETE FROM ".$this->modelName." WHERE id = ". $this->id .";";
-    $statement = DB::query($sql);
+    Model::Remove($this->modelName, $this->id);
     $this->afterDestroy();
     return $this;
   }
@@ -250,83 +253,39 @@ class Model extends CoreModel {
      $sql.= join($cols, ', ');
      $sql.= " );";
      
-     return DB::query( $sql );
+     return DB::Query( $sql );
    }
 
-   public function _count($whereClause=null, $sqlPostfix=null) {
-     return self::Count($this->modelName, $whereClause, $sqlPostfix);
+   public static function Get($modelName, $id) {
+     $sql = "SELECT * FROM ".$modelName." WHERE id = ". $id ." LIMIT 1;";
+     $results = DB::FetchAll($sql);
+     $mdls = array();
+     foreach ($results as $row) {
+       $mdls[] = new $modelName($row);
+     }
+     return @$mdls[0];
    }
-   static public function Count($className, $whereClause=null, $sqlPostfix=null) {
-     $sql = "SELECT count(id) as count FROM ".$className;
-     if($whereClause != null) $sql .= " WHERE ".$whereClause;
-     if($sqlPostfix != null)  $sql .= " ".$sqlPostfix;
-     $sql .= ';';
-     $statement = DB::query($sql);
+   
+   public static function Find($modelName) {
+     return new ModelFinder($modelName);
+   }
+
+   // Does NOT fire callbacks...
+   public static function Remove($modelName, $id) {
+     $sql = "DELETE FROM ".$modelName." WHERE id = ". $id .";";
+     DB::Query($sql);
+   }
+
+   static public function Count($className) {
+     $sql = "SELECT count(id) as count FROM ".$className.";";
+     $statement = DB::Query($sql);
      if($statement) {
        $results = $statement->fetchAll(); // PDO::FETCH_ASSOC ???
-       return (integer)$results[0]['count'];
+       return @(integer)$results[0]['count'];
      } else { // Throw an ERROR?
        return 0;
      }
    }
-
-   public function _query($whereClause=null, $sqlPostfix='', $selectClause='*') {
-     if(@ strpos(strtolower(' '.$sqlPostfix), 'order') < 1 && isset($this->defaultOrderBy)) {
-       $sqlPostfix .= " ORDER BY ".$this->defaultOrderBy;
-     }
-     return self::Query($this->modelName, $whereClause, $sqlPostfix, $selectClause);
-   }
-   static public function Query($className, $whereClause=null, $sqlPostfix='', $selectClause='*') {
-     $sql = "SELECT ". $selectClause ." FROM ".$className." ";
-     if($whereClause != null) {
-       $sql .= " WHERE ". $whereClause;
-     }
-     if(@ strpos(strtolower(' '.$sqlPostfix), 'order') < 1) {
-       // God I hate this... WILL BE REMOVED SOON!!!
-       $mdl = new $className();
-       if(isset($mdl->defaultOrderBy)) {
-         $sql .= " ORDER BY ".$mdl->defaultOrderBy." ";
-       }
-     }
-     if($sqlPostfix != '') {
-       $sql .= " ". $sqlPostfix;
-     }
-     $sql .= ';';
-     $statement = DB::query($sql);
-     if(!$statement) {
-       $errInfo = DB::getLastError();
-       throw new Exception("DB Error: ".$errInfo[2] ."\n". $sql);
-     }
-     return $statement->fetchAll(PDO::FETCH_ASSOC);
-   }
-
-   public function _find($whereClause=null, $sqlPostfix='', $selectClause='*') {
-     return self::Find($this->modelName, $whereClause, $sqlPostfix, $selectClause);
-   }
-   static public function Find($className, $whereClause=null, $sqlPostfix='', $selectClause='*') {
-     $results = self::Query($className, $whereClause, $sqlPostfix, $selectClause);
-     $models = array();
-     foreach($results as $row) {
-       $models[] = new $className($row);
-     }
-     return $models;
-   }
-
-   public function _findFirst($whereClause=null, $sqlPostfix='') {
-     return self::FindFirst($this->modelName, $whereClause, $sqlPostfix);
-   }
-   static public function FindFirst($className, $whereClause=null, $sqlPostfix='') {
-     $models = self::Find($className, $whereClause, $sqlPostfix." LIMIT 1");
-     return @ $models[0];
-   }
-
-   public function _findById($id) {
-     return self::FindById($this->modelName);
-   }
-   static public function FindById($className, $id) {
-     return self::FindFirst($className, "id = ".$id);
-   }
-  
 }
 
 

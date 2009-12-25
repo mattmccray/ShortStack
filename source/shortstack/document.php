@@ -1,106 +1,6 @@
 <?php
  
-class Document {
-  private static $_document_indexes_ = array();
-  
-  public static function Register($class) {
-    $doc = new $class();
-    $doc->_defineDocumentFromModel();
-  }
-  
-  public static function Define($name, $indexes=array(), $createClass=true) {
-    Document::$_document_indexes_[$name] = array_merge($indexes, array()); // a hokey way to clone an array
-    if($createClass)
-      eval("class ". $name ." extends DocumentModel {  }");
-  }
-  
-  public static function InitializeDatabase() {
-    // Loop through all the docs and create tables and index tables...
-    foreach( Document::$_document_indexes_ as $docType => $indexes) {
-      $tableSQL = "CREATE TABLE IF NOT EXISTS ". $docType ." ( id INTEGER PRIMARY KEY, data TEXT, created_on TIMESTAMP, updated_on TIMESTAMP );";
-      DB::query( $tableSQL );
-      foreach ($indexes as $field=>$fType) {
-        $indexSQL = "CREATE TABLE IF NOT EXISTS ". $docType ."_". $field ."_idx ( id INTEGER PRIMARY KEY, docid INTEGER, ". $field ." ". $fType ." );";
-        DB::query( $indexSQL );
-      }
-    }
-  }
-  
-  public static function Reindex($doctype=null, $id=null) {
-    // Loop through all the records, deserialize the data column and recreate the index rows
-    $docs = array();
-    // Step one: Fetch all the documents to update...
-    if($doctype != null) {
-      if(!array_key_exists($doctype, Document::$_document_indexes_)) {
-        $tmp = new $doctype();
-        $tmp->_defineDocumentFromModel();
-      }
-      if($id != null) {
-        $sql = "SELECT * FROM ".$doctype." WHERE id = ". $id .";";
-      } else {
-        $sql = "SELECT * FROM ".$doctype.";";
-      }
-      $results = DB::fetchAll($sql);
-      foreach ($results as $row) {
-        $docs[] = new $doctype($row);
-      }
-    } else {
-      // Do 'em all!
-      foreach( Document::$_document_indexes_ as $docType => $indexes) {
-        $sql = "SELECT * FROM ".$doctype."";
-        $results = DB::fetchAll($sql);
-        foreach ($results as $row) {
-          $docs[] = new $doctype($row);
-        }
-      }
-    }
-    // Step two: Loop through them and delete, then rebuild index rows
-    foreach ($docs as $doc) {
-      $indexes = Document::GetIndexesFor($doc->modelName);
-      if(count($indexes) > 0) {
-        foreach ($indexes as $field=>$fType) {
-          // TODO: Optimize as single transactions?
-          $indexTable = $doc->modelName ."_". $field ."_idx";
-          $sql = "DELETE FROM ". $indexTable ." WHERE docid = ". $doc->id .";";
-          $results = DB::query($sql);
-          $sql = "INSERT INTO ". $indexTable ." ( docid, ". $field ." ) VALUES (".$doc->id.', "'.htmlentities($doc->{$field}, ENT_QUOTES).'" );';
-          $results = DB::query($sql);
-        }
-      } else {
-        echo "! No indexes for ". $doc->modelName ."\n";
-      }
-    }
-  }
-  
-  public static function Get($doctype, $id) {
-    $sql = "SELECT * FROM ".$doctype." WHERE id = ". $id .";";
-    $results = DB::fetchAll($sql);
-    $docs = array();
-    foreach ($results as $row) {
-      $docs[] = new $doctype($row);
-    }
-    return @$docs[0];
-  }
- 
-  public static function Find($doctype) {
-    return new DocumentFinder($doctype);
-  }
-  
-  public static function Destroy($doctype, $id) {
-    $sql = "DELETE FROM ".$doctype." WHERE id = ". $id .";";
-    DB::query($sql);
-    foreach ( Document::GetIndexesFor($doctype) as $field=>$fType) {
-      $sql = "DELETE FROM ".$doctype."_".$field."_idx WHERE docid = ". $id .";";
-      DB::query($sql);
-    }
-  }
-
-  public static function GetIndexesFor($doctype) {
-    return Document::$_document_indexes_[$doctype];
-  }
-}
-
-class DocumentModel extends CoreModel {
+class Document extends CoreModel {
 
   public $id = null;
   protected $rawData = null;
@@ -141,20 +41,20 @@ class DocumentModel extends CoreModel {
 
   public function save() {
     if($this->isDirty) {
-      $this->beforeSave(); // Cannot cancel events... yet.
+      $this->beforeSave();
       if($this->isNew) { // Insert
-        $this->beforeCreate(); // Cannot cancel events... yet.
+        $this->beforeCreate();
         $this->_serialize();
         $sql = 'INSERT INTO '.$this->modelName.' ( data ) VALUES ( "'. $this->rawData .'" );';
-        $statement = DB::query($sql);
-        $result = DB::query('SELECT last_insert_rowid() as last_insert_rowid')->fetch(); // Get the record's generated ID...
+        $statement = DB::Query($sql);
+        $result = DB::Query('SELECT last_insert_rowid() as last_insert_rowid')->fetch(); // Get the record's generated ID...
         $this->id = $result['last_insert_rowid'];
         Document::Reindex($this->modelName, $this->id);
-        $this->afterCreate(); // Cannot cancel events... yet.
+        $this->afterCreate();
       } else { // Update
-        $this->serialize();
+        $this->_serialize();
         $sql = "UPDATE ".$this->modelName.' SET data="'.htmlentities( json_encode($this->data), ENT_QUOTES).'" WHERE id = '. $this->id .';';
-        $statement = DB::query($sql);
+        $statement = DB::Query($sql);
         $index_changed = array_intersect($this->changedFields, array_keys(Document::GetIndexesFor($this->modelName)));
         if(count($index_changed) > 0)  // Only if an indexed field has changed
           Document::Reindex($this->modelName, $this->id);
@@ -162,16 +62,16 @@ class DocumentModel extends CoreModel {
       $this->changedFields = array();
       $this->isDirty = false;
       $this->isNew = false;
-      $this->afterSave(); // Cannot cancel events... yet.
+      $this->afterSave();
     }
     return $this;
   }
 
   // Warning: Like Han solo, this method doesn't fuck around, it will shoot first.
   public function destroy() {
-    $this->beforeDestroy(); // Cannot cancel events... yet.
-    Document::Destroy($this->modelName, $this->id);
-    $this->afterDestroy(); // Cannot cancel events... yet.
+    $this->beforeDestroy();
+    Document::Remove($this->modelName, $this->id);
+    $this->afterDestroy();
     return $this;
   }
   
@@ -213,6 +113,119 @@ class DocumentModel extends CoreModel {
     }
     return $attrs;
   }
+  
+  // Static Methods
+  
+  private static $_document_indexes_ = array();
+  
+  public static function Register($class) {
+    $doc = new $class();
+    $doc->_defineDocumentFromModel();
+  }
+  
+  public static function Define($name, $indexes=array(), $createClass=true) {
+    Document::$_document_indexes_[$name] = array_merge($indexes, array()); // a hokey way to clone an array
+    if($createClass)
+      eval("class ". $name ." extends Document {  }");
+  }
+  
+  public static function InitializeDatabase() {
+    // Loop through all the docs and create tables and index tables...
+    foreach( Document::$_document_indexes_ as $docType => $indexes) {
+      $tableSQL = "CREATE TABLE IF NOT EXISTS ". $docType ." ( id INTEGER PRIMARY KEY, data TEXT, created_on TIMESTAMP, updated_on TIMESTAMP );";
+      DB::Query( $tableSQL );
+      foreach ($indexes as $field=>$fType) {
+        $indexSQL = "CREATE TABLE IF NOT EXISTS ". $docType ."_". $field ."_idx ( id INTEGER PRIMARY KEY, docid INTEGER, ". $field ." ". $fType ." );";
+        DB::Query( $indexSQL );
+      }
+    }
+  }
+  
+  public static function Reindex($doctype=null, $id=null) {
+    // Loop through all the records, deserialize the data column and recreate the index rows
+    $docs = array();
+    // Step one: Fetch all the documents to update...
+    if($doctype != null) {
+      if(!array_key_exists($doctype, Document::$_document_indexes_)) {
+        $tmp = new $doctype();
+        $tmp->_defineDocumentFromModel();
+      }
+      if($id != null) {
+        $sql = "SELECT * FROM ".$doctype." WHERE id = ". $id .";";
+      } else {
+        $sql = "SELECT * FROM ".$doctype.";";
+      }
+      $results = DB::FetchAll($sql);
+      foreach ($results as $row) {
+        $docs[] = new $doctype($row);
+      }
+    } else {
+      // Do 'em all!
+      foreach( Document::$_document_indexes_ as $docType => $indexes) {
+        $sql = "SELECT * FROM ".$doctype."";
+        $results = DB::FetchAll($sql);
+        foreach ($results as $row) {
+          $docs[] = new $doctype($row);
+        }
+      }
+    }
+    // Step two: Loop through them and delete, then rebuild index rows
+    foreach ($docs as $doc) {
+      $indexes = Document::GetIndexesFor($doc->modelName);
+      if(count($indexes) > 0) {
+        foreach ($indexes as $field=>$fType) {
+          // TODO: Optimize as single transactions?
+          $indexTable = $doc->modelName ."_". $field ."_idx";
+          $sql = "DELETE FROM ". $indexTable ." WHERE docid = ". $doc->id .";";
+          $results = DB::Query($sql);
+          $sql = "INSERT INTO ". $indexTable ." ( docid, ". $field ." ) VALUES (".$doc->id.', "'.htmlentities($doc->{$field}, ENT_QUOTES).'" );';
+          $results = DB::Query($sql);
+        }
+      } else {
+        echo "! No indexes for ". $doc->modelName ."\n";
+      }
+    }
+  }
+  
+  public static function Get($doctype, $id) {
+    $sql = "SELECT * FROM ".$doctype." WHERE id = ". $id ." LIMIT 1;";
+    $results = DB::FetchAll($sql);
+    $docs = array();
+    foreach ($results as $row) {
+      $docs[] = new $doctype($row);
+    }
+    return @$docs[0];
+  }
+ 
+  public static function Find($doctype) {
+    return new DocumentFinder($doctype);
+  }
+  
+  // Doesn't fire callbacks!
+  public static function Remove($doctype, $id) {
+    $sql = "DELETE FROM ".$doctype." WHERE id = ". $id .";";
+    DB::Query($sql);
+    foreach ( Document::GetIndexesFor($doctype) as $field=>$fType) {
+      $sql = "DELETE FROM ".$doctype."_".$field."_idx WHERE docid = ". $id .";";
+      DB::Query($sql);
+    }
+  }
+  
+  public static function Count($doctype) {
+    $sql = "SELECT count(id) as count FROM ".$doctype.";";
+    $statement = DB::Query($sql);
+    if($statement) {
+      $results = $statement->fetchAll(); // PDO::FETCH_ASSOC ???
+      return @(integer)$results[0]['count'];
+    } else { // Throw an ERROR?
+      return 0;
+    }
+  }
+
+  public static function GetIndexesFor($doctype) {
+    return Document::$_document_indexes_[$doctype];
+  }
+  
 }
 
 
@@ -274,5 +287,5 @@ class DocumentFinder extends CoreFinder {
       $col .= ".". $column;
     }
     return $col; 
-  }
+  }  
 }

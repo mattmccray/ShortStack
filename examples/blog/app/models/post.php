@@ -1,6 +1,6 @@
 <?php
 
-class Post extends DocumentModel {
+class Post extends Document {
   $indexes = array(
     'slug'         => 'STRING',
     'author'       => 'STRING',

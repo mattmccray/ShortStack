@@ -1,6 +1,6 @@
 <?php
 
-class Post extends DocumentModel {
+class Post extends Document {
   protected $indexes = array(
     'user_id'      => 'INTEGER',
     'slug'         => 'STRING',
@@ -10,7 +10,7 @@ class Post extends DocumentModel {
   protected $hasMany = array(
     'comments' => array('document'=>'Comment')
   );
-  protected $belongs_to = array(
+  protected $belongsTo = array(
     'user' => array('model'=>'User'),
   );
   

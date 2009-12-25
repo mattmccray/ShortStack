@@ -47,20 +47,20 @@ class CoreFinder implements IteratorAggregate {
     return $this;
   }
   
-  public function count() {
-    return count($this->fetch());
+  public function count($ignoreCache=false) {
+    return count($this->fetch($ignoreCache));
   }
   
-  public function get() {   // Returns the first match
+  public function get($ignoreCache=false) {   // Returns the first match
     $oldLimit = $this->limit;
     $this->limit = 1; // Waste not, want not.
-    $docs = $this->_execQuery();
+    $docs = $this->_execQuery($ignoreCache);
     $this->limit = $oldLimit;
     return @$docs[0];
   }
   
-  public function fetch() { // Executes current query
-    return $this->_execQuery();
+  public function fetch($ignoreCache=false) { // Executes current query
+    return $this->_execQuery($ignoreCache);
   }
   
   public function getIterator() { // For using the finder as an array in foreach() statements
@@ -94,10 +94,10 @@ class CoreFinder implements IteratorAggregate {
   }
   
   
-  protected function _execQuery() {
-    if($this->__cache != false) return $this->__cache;
+  protected function _execQuery($ignoreCache=false) {
+    if($ignoreCache == false && $this->__cache != false) return $this->__cache;
     $sql = $this->_buildSQL();
-    $stmt = DB::query($sql);
+    $stmt = DB::Query($sql);
     $items = array();
     if($stmt) {
       $results = $stmt->fetchAll();

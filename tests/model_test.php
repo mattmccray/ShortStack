@@ -37,4 +37,16 @@ class TestOfModel extends UnitTestCase {
     $this->assertEqual( Model::Count('User'), 0 );
   }
   
+  function testFinder() {
+    
+  }
+  
+  function testRelations() {
+    
+  }
+  
+  function testRelationToDocuments() {
+    
+  }
+  
 }

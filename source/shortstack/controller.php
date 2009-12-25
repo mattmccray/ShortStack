@@ -14,7 +14,7 @@ class Controller {
   }
   
   function render($view, $params=array(), $wrapInLayout=null) {
-    $tmpl = new Template( ShortStack::viewPath($view) );
+    $tmpl = new Template( ShortStack::ViewPath($view) );
     $content = $tmpl->fetch($params);
     $this->renderText($content, $params, $wrapInLayout);
   }
@@ -23,7 +23,7 @@ class Controller {
     $layoutView = ($wrapInLayout == null) ? $this->defaultLayout : $wrapInLayout;
     
     if($layoutView !== false) {
-      $layout = new Template( ShortStack::viewPath($layoutView) );
+      $layout = new Template( ShortStack::ViewPath($layoutView) );
       $layout->contentForLayout = $text;
       $layout->display($params);
     } else {

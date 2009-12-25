@@ -13,9 +13,9 @@ try {
   include_once('../../dist/shortstack.php');
 } catch (EmptyDbException $e) {
   if(@ strpos('install', (string)$_SERVER['PATH_INFO']) == -1 )
-    Dispatcher::recognize('install');
+    Dispatcher::Recognize('install');
 }
 
 if(! Dispatcher::$dispatched ) {
-  Dispatcher::recognize();
+  Dispatcher::Recognize();
 }

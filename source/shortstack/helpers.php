@@ -35,7 +35,7 @@ function camelize($str) {
 
 function use_helper($helper) {
   if(! strpos($helper, 'elper') > 0) $helper .= "_helper";
-  require_once( ShortStack::helperPath($helper) );
+  require_once( ShortStack::HelperPath($helper) );
 }
 
 function getBaseUri() { // Used by the Dispatcher
@@ -58,9 +58,19 @@ function doc($doctype, $id=null) {// For use with documents
 
 function mdl($objtype, $id=null) {// For use with documents
   if($id != null) {
-    return Model::FindById($objtype, $id);
+    return Model::Get($objtype, $id);
   } else {
-    return new ModelFinder($doctype);
+    return Model::Find($doctype);
+  }
+}
+
+function get($modelName, $id=null) {
+  $c = new ReflectionClass($modelName);
+  if($c->isSubclassOf('Model')) {
+    return mdl($modelName, $id);
+  } else {
+    // Do another subclass test??
+    return doc($modelName, $id);
   }
 }
 

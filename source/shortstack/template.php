@@ -15,6 +15,7 @@ class Template {
   function __set($key, $value) {
     $this->context[$key] = $value;
   }
+  
   function __get($key) {
     if(array_key_exists($key, $this->context)) {
       return $this->context[$key];

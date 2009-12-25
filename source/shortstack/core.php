@@ -18,17 +18,17 @@ class ShortStack {
   public static function AutoLoadFinder($className) {
     global $shortstack_config;
     if(strpos($className, 'ontroller') > 0) {
-      return self::controllerPath( underscore($className) );
+      return self::ControllerPath( underscore($className) );
     } else if(strpos($className, 'elper') > 0) {
-        return self::helperPath( underscore($className) );
+        return self::HelperPath( underscore($className) );
     } else { // Model
-      return self::modelPath( underscore($className) );
+      return self::ModelPath( underscore($className) );
     }    
   }
   // Loads all models in the models/ folder and returns the model class names
   public static function LoadAllModels() {
     global $shortstack_config;
-    $model_files = glob( self::modelPath("*") );
+    $model_files = glob( self::ModelPath("*") );
     $classNames = array();
     foreach($model_files as $filename) {
       $className = str_replace($shortstack_config['models']['folder']."/", "", $filename);
@@ -48,7 +48,7 @@ class ShortStack {
         $res = $mdl->_createTableForModel();
         $res->execute();
       
-      } else if($mdl instanceof DocumentModel) {
+      } else if($mdl instanceof Document) {
         $res = $mdl->_defineDocumentFromModel();
         $needDocInit = true;
       }
@@ -57,19 +57,19 @@ class ShortStack {
     return $modelnames;
   }
   // File paths...
-  public static function viewPath($path) {
-    return self::getPathFor('views', $path);
+  public static function ViewPath($path) {
+    return self::GetPathFor('views', $path);
   }
-  public static function controllerPath($path) {
-    return self::getPathFor('controllers', $path);
+  public static function ControllerPath($path) {
+    return self::GetPathFor('controllers', $path);
   }
-  public static function modelPath($path) {
-    return self::getPathFor('models', $path);
+  public static function ModelPath($path) {
+    return self::GetPathFor('models', $path);
   }
-  public static function helperPath($path) {
-    return self::getPathFor('helpers', $path);
+  public static function HelperPath($path) {
+    return self::GetPathFor('helpers', $path);
   }
-  protected static function getPathFor($type, $path) {
+  protected static function GetPathFor($type, $path) {
     global $shortstack_config;
     return $shortstack_config[$type]['folder']."/".$path.".php";
   }

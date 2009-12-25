@@ -3,12 +3,13 @@
 A simple, easily customized, MVC framework for PHP. Currently built for use with PHP > 5, PDO, and SQLite.
 
 * DB Abstraction Layer (over PDO)
-* Models
-* Document Store (Simple schema-less storage in SQLite)
+* Models with `hasMany`/`belongsTo` relationships
+* Documents (or schema-less models, loosely based on [friendfeed][] design) can mix and match with Models
 * Controllers/Actions (hybrid)
 * Templates
 * Caching (coming soon)
 
+  [friendfeed]: http://bret.appspot.com/entry/how-friendfeed-uses-mysql
 
 ## Document Store
 
@@ -16,7 +17,7 @@ Still very early, but here are some usage examples...
     
 Define the doctype (classname) and any indexes for querying/ordering by:
 
-    class Post extends DocumentModel {
+    class Post extends Document {
       protected $indexes = array(
         'slug' => 'TEXT',
         'author' => 'TEXT',
@@ -90,15 +91,11 @@ Bulk Destroy Posts -- Kinda dangerous:
 
     doc('Post')->where('author')->neq('M@')->destroy();
 
-Coming soon: Relationships `hasMany` and `belongsTo`.
 
 
 ## Todos
 
-* Merge `Document` and `DocumentModel`?
-* Generic `get()` helper that figures out whether it's a doc or mdl?
 * Use PDO prepared statements where possible?
 * Better error handling.
 * Remove all the @ cruft
-* Remove all the AR-like crap from Models
 
