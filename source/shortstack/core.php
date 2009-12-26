@@ -13,6 +13,7 @@ class Redirect extends Exception { }
 class FullRedirect extends Exception { }
 class EmptyDbException extends Exception { }
 class NotFoundException extends Exception { }
+class StaleCache extends Exception { }
 
 class ShortStack {
   public static function AutoLoadFinder($className) {

@@ -3,11 +3,14 @@
 class Post extends Document {
   $indexes = array(
     'slug'         => 'STRING',
-    'author'       => 'STRING',
+    'user_id'      => 'INTEGER',
     'publish_date' => 'TIMESTAMP',
   );
   $hasMany = array(
-    'doctype'=>'Comment'
+    'document'=>'Comment'
+  );
+  $belongsTo = array(
+    'document'=>'User'
   );
 
   protected beforeCreate() {

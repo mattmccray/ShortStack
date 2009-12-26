@@ -67,8 +67,12 @@ class Controller {
     if($this->cacheOutput) {
       $cname = ($name == null) ? $this->cacheName : $name;
       if(Cache::Exists($cname)) {
-        echo Cache::Get($cname);
-        exit(0);
+        try {
+          echo Cache::Get($cname);
+          exit(0);
+        } catch(StaleCache $e) {
+          // Do nothing!
+        }
       }
     }
   }

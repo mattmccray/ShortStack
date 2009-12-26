@@ -1,12 +1,17 @@
 <?php
 
-class Comment extends Document {
+class Page extends Document {
   $indexes = array(
-    'post_id'      => 'INTEGER',
+    'slug'=>'STRING',
+    'user_id'=>'INTEGER',
   );
   $belongsTo = array(
-    'document'=>'Post'
+    'document'=>'User'
   );
+
+  protected beforeCreate() {
+    $this->slug = slugify($this->title);
+  }
   
   protected beforeSave() {
     if( $this->hasChanged('body_src') ){

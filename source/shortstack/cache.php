@@ -8,14 +8,24 @@ class Cache {
   }
 
   public static function Get($name) {
-    return file_get_contents( ShortStack::CachePath($name) );
+    $cacheContent = file_get_contents( ShortStack::CachePath($name) );
+    $splitter = strpos($cacheContent, "\n"); 
+    $contents = substr($cacheContent, $splitter+1, strlen($cacheContent) - $splitter);
+    $timeSinseCached = time() - intVal(substr($cacheContent, 0, $splitter));;
+    if($timeSinseCached > CACHELENGTH) {
+      Cache::Expire($name);
+      throw new StaleCache('Cache expired.');
+    } else {
+      return $contents;
+    }
   }
 
   public static function Save($name, $content) {
-    return file_put_contents( ShortStack::CachePath($name), $content);
+    $cacheContent = time() ."\n". $content;
+    return file_put_contents( ShortStack::CachePath($name), $cacheContent);
   }
 
-  public static function Remove($name) {
+  public static function Expire($name) {
     return @ unlink ( ShortStack::CachePath($name) );
   }
 

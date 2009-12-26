@@ -29,5 +29,6 @@ $shortstack_config = array(
   'cacheing' => array(
     'folder' => 'caches',
     'enabled' => true,
+    'expires' => 60*60, // In Seconds (60*60 == 1h)
   ),
 );

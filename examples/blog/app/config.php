@@ -33,7 +33,8 @@ $config['shortstack'] = array(
     'autoload'=> array(),
   ),
   'cacheing' => array(
-    'folder' => 'caches',
+    'folder' => 'app/views/_cache',
     'enabled' => true,
+    'expires' => 60*60, // In Seconds (60*60 == 1h)
   ),
 );

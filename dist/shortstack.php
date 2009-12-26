@@ -1,6 +1,6 @@
 <?php
  
-// ShortStack v0.9.5
+// ShortStack v0.9.6b1
 // By M@ McCray
 // http://github.com/darthapo/ShortStack
 
@@ -18,6 +18,7 @@ class Redirect extends Exception { }
 class FullRedirect extends Exception { }
 class EmptyDbException extends Exception { }
 class NotFoundException extends Exception { }
+class StaleCache extends Exception { }
 
 class ShortStack {
   public static function AutoLoadFinder($className) {
@@ -232,14 +233,24 @@ class Cache {
   }
 
   public static function Get($name) {
-    return file_get_contents( ShortStack::CachePath($name) );
+    $cacheContent = file_get_contents( ShortStack::CachePath($name) );
+    $splitter = strpos($cacheContent, "\n"); 
+    $contents = substr($cacheContent, $splitter+1, strlen($cacheContent) - $splitter);
+    $timeSinseCached = time() - intVal(substr($cacheContent, 0, $splitter));;
+    if($timeSinseCached > CACHELENGTH) {
+      Cache::Expire($name);
+      throw new StaleCache('Cache expired.');
+    } else {
+      return $contents;
+    }
   }
 
   public static function Save($name, $content) {
-    return file_put_contents( ShortStack::CachePath($name), $content);
+    $cacheContent = time() ."\n". $content;
+    return file_put_contents( ShortStack::CachePath($name), $cacheContent);
   }
 
-  public static function Remove($name) {
+  public static function Expire($name) {
     return @ unlink ( ShortStack::CachePath($name) );
   }
 
@@ -319,8 +330,12 @@ class Controller {
     if($this->cacheOutput) {
       $cname = ($name == null) ? $this->cacheName : $name;
       if(Cache::Exists($cname)) {
-        echo Cache::Get($cname);
-        exit(0);
+        try {
+          echo Cache::Get($cname);
+          exit(0);
+        } catch(StaleCache $e) {
+          // Do nothing!
+        }
       }
     }
   }
@@ -1293,6 +1308,7 @@ if(!isset($shortstack_config)) {
     'cacheing' => array(
       'folder' => 'caches',
       'enabled' => true,
+      'expires' => 60*60, // In Seconds (60*60 == 1h)
     ),
   );
 }
@@ -1300,6 +1316,8 @@ if(!isset($shortstack_config)) {
 if( isset($shortstack_config) ) {
   define('FORCESHORTTAGS', @$shortstack_config['views']['force_short_tags']);
   define('USECACHE', @$shortstack_config['cacheing']['enabled']);
+  define('CACHELENGTH', @$shortstack_config['cacheing']['expires']);
+
   if(@ is_array($shortstack_config['helpers']['autoload']) ) {
     foreach($shortstack_config['helpers']['autoload'] as $helper) {
       require_once( ShortStack::HelperPath($helper."_helper"));

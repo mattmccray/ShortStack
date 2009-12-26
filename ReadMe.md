@@ -4,18 +4,19 @@ A simple, easily customized, MVC framework for PHP. Currently built for use with
 
 * DB Abstraction Layer (over PDO)
 * Models with `hasMany`/`belongsTo` relationships
-* Documents (or schema-less models, loosely based on [friendfeed][] design) can mix and match with Models
+* Documents (or schema-less models, loosely based on the [friendfeed][] design) can mix and match with Models
 * Controllers/Actions (hybrid)
+* View Caching
 * Templates
-* Caching (coming soon)
 
   [friendfeed]: http://bret.appspot.com/entry/how-friendfeed-uses-mysql
 
-## Document Store
 
-Still very early, but here are some usage examples...
-    
-Define the doctype (classname) and any indexes for querying/ordering by:
+## Documents
+
+To create a Document, just create a class that extends `Document` and define any fields (to index) that you want to query or sort by.
+
+Example:    
 
     class Post extends Document {
       protected $indexes = array(
@@ -35,7 +36,7 @@ Define the doctype (classname) and any indexes for querying/ordering by:
     }
 
 
-Initialize the DB (if you've created new documents/indexes):
+Initialize the DB:
 
     ShortStack::InitializeDatabase();
 
@@ -50,6 +51,7 @@ Create a Post:
       'publish_date' => 123456789,
     ));
     $post->save();
+
 
 Get Post With ID of 1:
 
@@ -74,6 +76,7 @@ Update Post:
     ));
     $post->save();
 
+
 Bulk Update Posts:
     
     doc('Post')->where('author')->eq('M@')->update(array(
@@ -86,6 +89,7 @@ Destroy Post:
     $post->destroy();
     doc('Post', 1)->destroy()
     Document::Destroy('Post', 1);
+
 
 Bulk Destroy Posts -- Kinda dangerous:
 

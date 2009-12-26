@@ -27,6 +27,7 @@ if(!isset($shortstack_config)) {
     'cacheing' => array(
       'folder' => 'caches',
       'enabled' => true,
+      'expires' => 60*60, // In Seconds (60*60 == 1h)
     ),
   );
 }
@@ -34,6 +35,8 @@ if(!isset($shortstack_config)) {
 if( isset($shortstack_config) ) {
   define('FORCESHORTTAGS', @$shortstack_config['views']['force_short_tags']);
   define('USECACHE', @$shortstack_config['cacheing']['enabled']);
+  define('CACHELENGTH', @$shortstack_config['cacheing']['expires']);
+
   if(@ is_array($shortstack_config['helpers']['autoload']) ) {
     foreach($shortstack_config['helpers']['autoload'] as $helper) {
       require_once( ShortStack::HelperPath($helper."_helper"));
