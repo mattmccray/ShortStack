@@ -3,11 +3,13 @@
 A simple, easily customized, MVC framework for PHP. Currently built for use with PHP > 5, PDO, and SQLite.
 
 * DB Abstraction Layer (over PDO)
-* Models with `hasMany`/`belongsTo` relationships
+* Models with `hasMany`/`belongsTo` (and `hasMany(through)`) relationships
 * Documents (or schema-less models, loosely based on the [friendfeed][] design) can mix and match with Models
 * Controllers/Actions (hybrid)
-* View Caching
 * Templates
+* Pager helper class
+* View Caching
+* Core Framework < 50k in a single `.php` file
 
   [friendfeed]: http://bret.appspot.com/entry/how-friendfeed-uses-mysql
 
@@ -99,7 +101,8 @@ Bulk Destroy Posts -- Kinda dangerous:
 
 ## Todos
 
+* Consolidate `CoreModel` and `Model`
+* Consolidate `CoreFinder` and `ModelFinder`
 * Use PDO prepared statements where possible?
 * Better error handling.
 * Remove all the @ cruft
-

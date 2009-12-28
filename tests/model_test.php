@@ -29,12 +29,15 @@ class TestOfModel extends UnitTestCase {
   
   function testCreated() {
     $this->assertEqual( Model::Count('User'), 1 );
+    $this->assertEqual( get('User')->count(), 1 );
   }
  
   function testDestroyed() {
 //    mdl('User')->destroy();
+    $this->assertEqual( Model::Count('User'), 1 );
     $this->user->destroy();
     $this->assertEqual( Model::Count('User'), 0 );
+    $this->assertEqual( get('User')->count(), 0 );
   }
   
   function testFinder() {

@@ -8,33 +8,33 @@ class CoreFinder implements IteratorAggregate {
   protected $or_finder = array();
   protected $order = array();
   protected $limit = false;
+  protected $offset = false;
   private $__cache = false;
   
   public function __construct($objtype) {
     $this->objtype = $objtype;
+    $this->matcher = new FinderMatch($this);
   }
   
   public function where($index) {
     $this->__cache = false;
-    if(! $this->matcher) $this->matcher = new FinderMatch($this, $index);
     $this->matcher->_updateIdxAndCls($index, 'and');
     return $this->matcher;
   }
   
   public function andWhere($index) {
     $this->__cache = false;
-    if(! $this->matcher) $this->matcher = new FinderMatch($this, $index);
     $this->matcher->_updateIdxAndCls($index, 'and');
     return $this->matcher;
   }
 
   public function orWhere($index) {
     $this->__cache = false;
-    if(! $this-matcher) $this->matcher = new FinderMatch($this, $index);
     $this->matcher->_updateIdxAndCls($index, 'or');
     return $this->matcher;
   }
   
+  // TODO: Change this to replace the order array, and possibly use func_get_args()
   public function order($field, $dir='ASC') {
     $this->__cache = false;
     $this->order[$field] = $dir;
@@ -46,9 +46,18 @@ class CoreFinder implements IteratorAggregate {
     $this->limit = $count;
     return $this;
   }
+
+  public function offset($count) {
+    $this->__cache = false;
+    $this->offset = $count;
+    return $this;
+  }
   
-  public function count($ignoreCache=false) {
-    return count($this->fetch($ignoreCache));
+  public function count() {
+    $sql = $this->_buildSQL(true);
+    $res = DB::FetchAll($sql);
+    return intVal( $res[0]['count'] );  
+//    return count($this->fetch($ignoreCache));
   }
   
   public function get($ignoreCache=false) {   // Returns the first match
@@ -56,11 +65,21 @@ class CoreFinder implements IteratorAggregate {
     $this->limit = 1; // Waste not, want not.
     $docs = $this->_execQuery($ignoreCache);
     $this->limit = $oldLimit;
-    return @$docs[0];
+    if(count($docs) == 0)
+      return null;
+    else
+      return @$docs[0];
   }
   
   public function fetch($ignoreCache=false) { // Executes current query
     return $this->_execQuery($ignoreCache);
+  }
+  
+  // Returns the raw resultset...
+  public function raw($ignoreCache=true) {
+    $sql = $this->_buildSQL();
+    $stmt = DB::Query($sql);
+    return $stmt->fetchAll();
   }
   
   public function getIterator() { // For using the finder as an array in foreach() statements
@@ -106,7 +125,8 @@ class CoreFinder implements IteratorAggregate {
         $items[] = new $className($rowdata);
       }
       $this->__cache = $items;
-    } // FIXME: ELSE THROW SQL ERROR??? Hmm...
+    } // FIXME: ELSE THROW SQL ERROR??? Hmm..
+//    else { echo "STATEMENT ERROR on $sql\nError: ". DB::GetLastError() ."\n"; }
     return $items;
   }
   

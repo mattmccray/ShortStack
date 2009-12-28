@@ -1,5 +1,8 @@
 <?php
 
+//TODO: Consolidate Model and CoreModel
+//TODO: Figure out what to do for hasMany relationships onDestroy (for throughs, kill the joins. Otherwise?)
+
 class CoreModel {
 
     public $modelName = null;
@@ -39,10 +42,6 @@ class CoreModel {
       }
     }
     
-    public function has($key) {
-      return array_key_exists($key, $this->data);
-    }
-    
     function __call( $method, $args ) {
       // TODO: Support relationships here...
       if(array_key_exists($method, $this->hasMany)) {
@@ -51,10 +50,12 @@ class CoreModel {
       else if(array_key_exists($method, $this->belongsTo)) {
         return $this->_handleBelongsTo($method, $args);
       }
-      // look for 'add'+hasManyName
-      // look for 'set'+belongsToName
+      else if(preg_match('/^(new|add|set)(.*)/', $method, $matches)) {
+        list($full, $mode, $modelName) = $matches;
+        return $this->_handleRelationshipBuilder($mode, $modelName, $args);
+      }
       else {
-        return NULL; // FIXME: What to do here?
+        return NULL; // FIXME: What to do here? Throw exception when __call is bad?
       }
     }
     
@@ -69,7 +70,13 @@ class CoreModel {
         $mdlClass = $def['model'];
         $fk = strtolower($this->modelName)."_id";
         return Model::Find($mdlClass, $fk." = ".$this->id);
-      } else {
+      }
+      else if(array_key_exists('through', $def)) {
+        $thruCls = $def['through'];
+        $thru = new $thruCls(null, $this);
+        return $thru->getRelated($method);
+      }
+      else {
         throw new Exception("A relationship has to be defined as a model or document");
       }
     }
@@ -88,6 +95,38 @@ class CoreModel {
       } else {
         throw new Exception("A relationship has to be defined as a model or document");
       }
+    }
+    
+    protected function _handleRelationshipBuilder($mode, $modelName, $args) {
+      $fk = strtolower($this->modelName)."_id";
+      if($mode == 'new') {
+        //TODO: Type and schema checking...
+        $mdl = new $modelName();
+        $mdl->{$fk} = $this->id;
+        if(count($args) > 0 && is_array($args[0])) {
+          $mdl->update($args[0]);
+        }
+        return $mdl;
+      }
+      else if($mode == 'add') {
+        //TODO: Type and schema checking...
+        list($mdl) = $args;
+        $mdl->{$fk} = $this->id;
+        $mdl->save();
+      }
+      else if($mode == 'set') {
+        //TODO: Type and schema checking...
+        list($mdl) = $args;
+        $this->{$fk} = $mdl->id;
+      }
+      else {
+        throw new Exception("Unknown relationship mode: ".$mode);
+      }
+      return $this;
+    }
+    
+    public function has($key) {
+      return array_key_exists($key, $this->data);
     }
     
     public function updateValues($values=array()) {
@@ -127,16 +166,15 @@ class CoreModel {
       return $results;
     }
     
-    // ????
-    public function assignTo($modelOrName, $id=null) {
-      if(is_string($modelOrName)) {
-        $fk = strtolower($modelOrName)."_id";
-        $this->$fk = $id;
-      } else {
-        $fk = strtolower( get_class($modelOrName))."_id";
-        $this->$fk = $modelOrName->id;
-      }
-      return $this;
+    protected function _handleSqlCreate() {
+    }
+    protected function _handleSqlInsert() {
+    }
+    protected function _handleSqlUpdate() {
+    }
+    protected function _handleSqlDelete() {
+    }
+    protected function _handleRelatedSqlDelete() {
     }
     
     public function to_array($exclude=array()) {
@@ -179,19 +217,25 @@ class Model extends CoreModel {
   
   protected $schema = array();
   
-  public function updateValues($values=array()) {
-    $valid_atts = array_keys( $this->schema );
-    foreach($values as $key=>$value) {
-      if(in_array($key, $valid_atts)) $this->$key = $value;
-    }
-    return $this;
-  }
+  // public function updateValues($values=array()) {
+  //   $valid_atts = array_keys( $this->schema );
+  //   foreach($values as $key=>$value) {
+  //     if(in_array($key, $valid_atts)) $this->$key = $value;
+  //   }
+  //   return $this;
+  // }
   
   protected function getChangedValues() {
+    $valid_atts = array_keys( $this->schema );
+    $cleanChangedFields = array();
     $results = array();
-    foreach($this->changedFields as $key=>$fieldname) {
-      $results[$fieldname] = '"'.htmlentities($this->$fieldname, ENT_QUOTES).'"';
+    foreach($this->changedFields as $fieldname) {
+      if(in_array($fieldname, $valid_atts)) {
+        $results[$fieldname] = '"'.htmlentities($this->$fieldname, ENT_QUOTES).'"';
+        $cleanChangedFields[] = $fieldname;
+      }
     }
+    $this->changedFields = $cleanChangedFields;
     return $results;
   }
   
@@ -204,6 +248,7 @@ class Model extends CoreModel {
         $values = $this->getChangedValues();
         $sql = "INSERT INTO ".$this->modelName." (".join($this->changedFields, ', ').") VALUES (".join($values, ', ').");";
         $statement = DB::Query($sql);
+        if($statement == false) return false;
         // Get the record's generated ID...
         $result = DB::Query('SELECT last_insert_rowid() as last_insert_rowid')->fetch();
         $this->data['id'] = $result['last_insert_rowid'];
@@ -217,13 +262,14 @@ class Model extends CoreModel {
         }
         $sql = "UPDATE ".$this->modelName." SET ". join($fields, ", ") ." WHERE id = ". $this->id .";";
         $statement = DB::Query($sql);
+        if($statement == false) return false;
       }
       $this->changedFields = array();
       $this->isDirty = false;
       $this->isNew = false;
       $this->afterSave();
     }
-    return $this;
+    return true;
   }
   
   // Warning: Like Han solo, this method doesn't fuck around, it will shoot first.
@@ -235,9 +281,12 @@ class Model extends CoreModel {
   }
   
   // = SQL Builder Helper Methods =
-   public function _createTableForModel() {
-     return self::CreateTableForModel($this->modelName, $this);
-   }
+  
+  public function _createTableForModel() {
+    return self::CreateTableForModel($this->modelName, $this);
+  }
+  
+  
    static public function CreateTableForModel($modelName, $mdlInst=false) {
      $sql = "CREATE TABLE IF NOT EXISTS ";
      $sql.= $modelName ." ( ";
@@ -253,6 +302,8 @@ class Model extends CoreModel {
      $sql.= join($cols, ', ');
      $sql.= " );";
      
+     //FIXME: If create_on or updated_on are in schema, create triggers to auto-update them.
+
      return DB::Query( $sql );
    }
 
@@ -292,8 +343,11 @@ class Model extends CoreModel {
 class ModelFinder extends CoreFinder {
 
   // Model _buildSQL
-  protected function _buildSQL() {
-    $sql = "SELECT * FROM ". $this->objtype ." ";
+  protected function _buildSQL($isCount=false) {
+    if($isCount)
+      $sql = "SELECT count(id) as count FROM ". $this->objtype ." ";
+    else
+      $sql = "SELECT * FROM ". $this->objtype ." ";
     // TODO: Implment OR logic...
     if(count($this->finder) > 0) {
       $sql .= "WHERE ";
@@ -303,6 +357,8 @@ class ModelFinder extends CoreFinder {
       }
       $sql .= join(" AND ", $finders);
     }
+    if($isCount) return $sql.";";
+
     if(count($this->order) > 0) {
       $sql .= " ORDER BY ";
       $order_params = array();
@@ -314,8 +370,54 @@ class ModelFinder extends CoreFinder {
     if($this->limit != false && $this->limit > 0) {
       $sql .= " LIMIT ". $this->limit ." ";
     }
+    if($this->offset != false && $this->offset > 0) {
+      $sql .= " OFFSET ". $this->offset ." ";
+    }
     $sql .= " ;";
     return $sql;
   }
 
+}
+
+class Joiner extends Model {
+  
+  protected $joins = array(); // OVERRIDE ME!
+  private $srcModel;
+  private $toModel;
+  
+  public function __construct($dataRow=null, $from=null) {
+    parent::__construct($dataRow);
+    $this->srcModel = $from;
+    if(count($this->joins) == 2) {
+      list($left, $right) = $this->joins;
+      $left = strtolower($left)."_id";
+      $right = strtolower($right)."_id";
+      if(! array_key_exists($left, $this->schema)) $this->schema[$left] = "INTEGER";
+      if(! array_key_exists($right, $this->schema)) $this->schema[$right] = "INTEGER";
+    }
+  }
+  
+  public function getRelated($to) {
+    list($a, $b) = $this->joins;
+    $srcMdlCls = $this->srcModel->modelName;
+    $toMdlCls = ($a == $srcMdlCls) ? $b : $a;
+    $srcId = strtolower($srcMdlCls)."_id";
+    $toId = strtolower($toMdlCls)."_id";
+    $id = $this->srcModel->id;
+    $sql = "SELECT * FROM $toMdlCls WHERE id IN (SELECT $toId FROM $this->modelName WHERE $srcId = $id);";
+    //echo $sql;
+    $stmt = DB::Query($sql);
+    $mdls = array();
+    if($stmt) {
+      $results = $stmt->fetchAll();
+      foreach ($results as $row) {
+        $mdls[] = new $toMdlCls($row);
+      }
+    } // else {
+    //       debug("No Statement Object for: $sql\nError: ");
+    //       debug(DB::GetLastError());
+    //     }
+    return $mdls;
+  }
+    
 }

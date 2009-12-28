@@ -1,6 +1,6 @@
 <?php
  
-// ShortStack v0.9.6b1
+// ShortStack v0.9.6b3
 // By M@ McCray
 // http://github.com/darthapo/ShortStack
 
@@ -18,6 +18,7 @@ class Redirect extends Exception { }
 class FullRedirect extends Exception { }
 class EmptyDbException extends Exception { }
 class NotFoundException extends Exception { }
+class DbException extends Exception { }
 class StaleCache extends Exception { }
 
 class ShortStack {
@@ -145,7 +146,7 @@ function mdl($objtype, $id=null) {// For use with documents
   if($id != null) {
     return Model::Get($objtype, $id);
   } else {
-    return Model::Find($doctype);
+    return Model::Find($objtype);
   }
 }
 
@@ -432,6 +433,7 @@ class DB {
   
   static public function Connect($conn, $user="", $pass="", $options=array()) {
     self::$pdo = new PDO($conn, $user, $pass, $options);
+    return self::$pdo;
   }
   
   static public function Query($sql_string) {
@@ -444,7 +446,12 @@ class DB {
 
   static public function FetchAll($sql_string) {
     $statement = self::Query($sql_string);
-    return $statement->fetchAll(); // PDO::FETCH_GROUP
+    if($statement != false) {
+      return $statement->fetchAll(); // PDO::FETCH_GROUP
+    } else {
+      $err = self::GetLastError();
+      throw new DbException("Error:\n\t".$err[2]."\nWas thrown by SQL:\n\t".$sql_string);
+    }
   }
   
   static public function EnsureNotEmpty() {
@@ -467,33 +474,33 @@ class CoreFinder implements IteratorAggregate {
   protected $or_finder = array();
   protected $order = array();
   protected $limit = false;
+  protected $offset = false;
   private $__cache = false;
   
   public function __construct($objtype) {
     $this->objtype = $objtype;
+    $this->matcher = new FinderMatch($this);
   }
   
   public function where($index) {
     $this->__cache = false;
-    if(! $this->matcher) $this->matcher = new FinderMatch($this, $index);
     $this->matcher->_updateIdxAndCls($index, 'and');
     return $this->matcher;
   }
   
   public function andWhere($index) {
     $this->__cache = false;
-    if(! $this->matcher) $this->matcher = new FinderMatch($this, $index);
     $this->matcher->_updateIdxAndCls($index, 'and');
     return $this->matcher;
   }
 
   public function orWhere($index) {
     $this->__cache = false;
-    if(! $this-matcher) $this->matcher = new FinderMatch($this, $index);
     $this->matcher->_updateIdxAndCls($index, 'or');
     return $this->matcher;
   }
   
+  // TODO: Change this to replace the order array, and possibly use func_get_args()
   public function order($field, $dir='ASC') {
     $this->__cache = false;
     $this->order[$field] = $dir;
@@ -505,9 +512,18 @@ class CoreFinder implements IteratorAggregate {
     $this->limit = $count;
     return $this;
   }
+
+  public function offset($count) {
+    $this->__cache = false;
+    $this->offset = $count;
+    return $this;
+  }
   
-  public function count($ignoreCache=false) {
-    return count($this->fetch($ignoreCache));
+  public function count() {
+    $sql = $this->_buildSQL(true);
+    $res = DB::FetchAll($sql);
+    return intVal( $res[0]['count'] );  
+//    return count($this->fetch($ignoreCache));
   }
   
   public function get($ignoreCache=false) {   // Returns the first match
@@ -515,11 +531,21 @@ class CoreFinder implements IteratorAggregate {
     $this->limit = 1; // Waste not, want not.
     $docs = $this->_execQuery($ignoreCache);
     $this->limit = $oldLimit;
-    return @$docs[0];
+    if(count($docs) == 0)
+      return null;
+    else
+      return @$docs[0];
   }
   
   public function fetch($ignoreCache=false) { // Executes current query
     return $this->_execQuery($ignoreCache);
+  }
+  
+  // Returns the raw resultset...
+  public function raw($ignoreCache=true) {
+    $sql = $this->_buildSQL();
+    $stmt = DB::Query($sql);
+    return $stmt->fetchAll();
   }
   
   public function getIterator() { // For using the finder as an array in foreach() statements
@@ -565,7 +591,8 @@ class CoreFinder implements IteratorAggregate {
         $items[] = new $className($rowdata);
       }
       $this->__cache = $items;
-    } // FIXME: ELSE THROW SQL ERROR??? Hmm...
+    } // FIXME: ELSE THROW SQL ERROR??? Hmm..
+//    else { echo "STATEMENT ERROR on $sql\nError: ". DB::GetLastError() ."\n"; }
     return $items;
   }
   
@@ -615,6 +642,9 @@ class FinderMatch {
   }
 }
 
+//TODO: Consolidate Model and CoreModel
+//TODO: Figure out what to do for hasMany relationships onDestroy (for throughs, kill the joins. Otherwise?)
+
 class CoreModel {
 
     public $modelName = null;
@@ -654,10 +684,6 @@ class CoreModel {
       }
     }
     
-    public function has($key) {
-      return array_key_exists($key, $this->data);
-    }
-    
     function __call( $method, $args ) {
       // TODO: Support relationships here...
       if(array_key_exists($method, $this->hasMany)) {
@@ -666,10 +692,12 @@ class CoreModel {
       else if(array_key_exists($method, $this->belongsTo)) {
         return $this->_handleBelongsTo($method, $args);
       }
-      // look for 'add'+hasManyName
-      // look for 'set'+belongsToName
+      else if(preg_match('/^(new|add|set)(.*)/', $method, $matches)) {
+        list($full, $mode, $modelName) = $matches;
+        return $this->_handleRelationshipBuilder($mode, $modelName, $args);
+      }
       else {
-        return NULL; // FIXME: What to do here?
+        return NULL; // FIXME: What to do here? Throw exception when __call is bad?
       }
     }
     
@@ -684,7 +712,13 @@ class CoreModel {
         $mdlClass = $def['model'];
         $fk = strtolower($this->modelName)."_id";
         return Model::Find($mdlClass, $fk." = ".$this->id);
-      } else {
+      }
+      else if(array_key_exists('through', $def)) {
+        $thruCls = $def['through'];
+        $thru = new $thruCls(null, $this);
+        return $thru->getRelated($method);
+      }
+      else {
         throw new Exception("A relationship has to be defined as a model or document");
       }
     }
@@ -703,6 +737,38 @@ class CoreModel {
       } else {
         throw new Exception("A relationship has to be defined as a model or document");
       }
+    }
+    
+    protected function _handleRelationshipBuilder($mode, $modelName, $args) {
+      $fk = strtolower($this->modelName)."_id";
+      if($mode == 'new') {
+        //TODO: Type and schema checking...
+        $mdl = new $modelName();
+        $mdl->{$fk} = $this->id;
+        if(count($args) > 0 && is_array($args[0])) {
+          $mdl->update($args[0]);
+        }
+        return $mdl;
+      }
+      else if($mode == 'add') {
+        //TODO: Type and schema checking...
+        list($mdl) = $args;
+        $mdl->{$fk} = $this->id;
+        $mdl->save();
+      }
+      else if($mode == 'set') {
+        //TODO: Type and schema checking...
+        list($mdl) = $args;
+        $this->{$fk} = $mdl->id;
+      }
+      else {
+        throw new Exception("Unknown relationship mode: ".$mode);
+      }
+      return $this;
+    }
+    
+    public function has($key) {
+      return array_key_exists($key, $this->data);
     }
     
     public function updateValues($values=array()) {
@@ -742,16 +808,15 @@ class CoreModel {
       return $results;
     }
     
-    // ????
-    public function assignTo($modelOrName, $id=null) {
-      if(is_string($modelOrName)) {
-        $fk = strtolower($modelOrName)."_id";
-        $this->$fk = $id;
-      } else {
-        $fk = strtolower( get_class($modelOrName))."_id";
-        $this->$fk = $modelOrName->id;
-      }
-      return $this;
+    protected function _handleSqlCreate() {
+    }
+    protected function _handleSqlInsert() {
+    }
+    protected function _handleSqlUpdate() {
+    }
+    protected function _handleSqlDelete() {
+    }
+    protected function _handleRelatedSqlDelete() {
     }
     
     public function to_array($exclude=array()) {
@@ -794,19 +859,25 @@ class Model extends CoreModel {
   
   protected $schema = array();
   
-  public function updateValues($values=array()) {
-    $valid_atts = array_keys( $this->schema );
-    foreach($values as $key=>$value) {
-      if(in_array($key, $valid_atts)) $this->$key = $value;
-    }
-    return $this;
-  }
+  // public function updateValues($values=array()) {
+  //   $valid_atts = array_keys( $this->schema );
+  //   foreach($values as $key=>$value) {
+  //     if(in_array($key, $valid_atts)) $this->$key = $value;
+  //   }
+  //   return $this;
+  // }
   
   protected function getChangedValues() {
+    $valid_atts = array_keys( $this->schema );
+    $cleanChangedFields = array();
     $results = array();
-    foreach($this->changedFields as $key=>$fieldname) {
-      $results[$fieldname] = '"'.htmlentities($this->$fieldname, ENT_QUOTES).'"';
+    foreach($this->changedFields as $fieldname) {
+      if(in_array($fieldname, $valid_atts)) {
+        $results[$fieldname] = '"'.htmlentities($this->$fieldname, ENT_QUOTES).'"';
+        $cleanChangedFields[] = $fieldname;
+      }
     }
+    $this->changedFields = $cleanChangedFields;
     return $results;
   }
   
@@ -819,6 +890,7 @@ class Model extends CoreModel {
         $values = $this->getChangedValues();
         $sql = "INSERT INTO ".$this->modelName." (".join($this->changedFields, ', ').") VALUES (".join($values, ', ').");";
         $statement = DB::Query($sql);
+        if($statement == false) return false;
         // Get the record's generated ID...
         $result = DB::Query('SELECT last_insert_rowid() as last_insert_rowid')->fetch();
         $this->data['id'] = $result['last_insert_rowid'];
@@ -832,13 +904,14 @@ class Model extends CoreModel {
         }
         $sql = "UPDATE ".$this->modelName." SET ". join($fields, ", ") ." WHERE id = ". $this->id .";";
         $statement = DB::Query($sql);
+        if($statement == false) return false;
       }
       $this->changedFields = array();
       $this->isDirty = false;
       $this->isNew = false;
       $this->afterSave();
     }
-    return $this;
+    return true;
   }
   
   // Warning: Like Han solo, this method doesn't fuck around, it will shoot first.
@@ -850,9 +923,12 @@ class Model extends CoreModel {
   }
   
   // = SQL Builder Helper Methods =
-   public function _createTableForModel() {
-     return self::CreateTableForModel($this->modelName, $this);
-   }
+  
+  public function _createTableForModel() {
+    return self::CreateTableForModel($this->modelName, $this);
+  }
+  
+  
    static public function CreateTableForModel($modelName, $mdlInst=false) {
      $sql = "CREATE TABLE IF NOT EXISTS ";
      $sql.= $modelName ." ( ";
@@ -868,6 +944,8 @@ class Model extends CoreModel {
      $sql.= join($cols, ', ');
      $sql.= " );";
      
+     //FIXME: If create_on or updated_on are in schema, create triggers to auto-update them.
+
      return DB::Query( $sql );
    }
 
@@ -907,8 +985,11 @@ class Model extends CoreModel {
 class ModelFinder extends CoreFinder {
 
   // Model _buildSQL
-  protected function _buildSQL() {
-    $sql = "SELECT * FROM ". $this->objtype ." ";
+  protected function _buildSQL($isCount=false) {
+    if($isCount)
+      $sql = "SELECT count(id) as count FROM ". $this->objtype ." ";
+    else
+      $sql = "SELECT * FROM ". $this->objtype ." ";
     // TODO: Implment OR logic...
     if(count($this->finder) > 0) {
       $sql .= "WHERE ";
@@ -918,6 +999,8 @@ class ModelFinder extends CoreFinder {
       }
       $sql .= join(" AND ", $finders);
     }
+    if($isCount) return $sql.";";
+
     if(count($this->order) > 0) {
       $sql .= " ORDER BY ";
       $order_params = array();
@@ -929,14 +1012,64 @@ class ModelFinder extends CoreFinder {
     if($this->limit != false && $this->limit > 0) {
       $sql .= " LIMIT ". $this->limit ." ";
     }
+    if($this->offset != false && $this->offset > 0) {
+      $sql .= " OFFSET ". $this->offset ." ";
+    }
     $sql .= " ;";
     return $sql;
   }
 
-} 
+}
+
+class Joiner extends Model {
+  
+  protected $joins = array(); // OVERRIDE ME!
+  private $srcModel;
+  private $toModel;
+  
+  public function __construct($dataRow=null, $from=null) {
+    parent::__construct($dataRow);
+    $this->srcModel = $from;
+    if(count($this->joins) == 2) {
+      list($left, $right) = $this->joins;
+      $left = strtolower($left)."_id";
+      $right = strtolower($right)."_id";
+      if(! array_key_exists($left, $this->schema)) $this->schema[$left] = "INTEGER";
+      if(! array_key_exists($right, $this->schema)) $this->schema[$right] = "INTEGER";
+    }
+  }
+  
+  public function getRelated($to) {
+    list($a, $b) = $this->joins;
+    $srcMdlCls = $this->srcModel->modelName;
+    $toMdlCls = ($a == $srcMdlCls) ? $b : $a;
+    $srcId = strtolower($srcMdlCls)."_id";
+    $toId = strtolower($toMdlCls)."_id";
+    $id = $this->srcModel->id;
+    $sql = "SELECT * FROM $toMdlCls WHERE id IN (SELECT $toId FROM $this->modelName WHERE $srcId = $id);";
+    //echo $sql;
+    $stmt = DB::Query($sql);
+    $mdls = array();
+    if($stmt) {
+      $results = $stmt->fetchAll();
+      foreach ($results as $row) {
+        $mdls[] = new $toMdlCls($row);
+      }
+    } // else {
+    //       debug("No Statement Object for: $sql\nError: ");
+    //       debug(DB::GetLastError());
+    //     }
+    return $mdls;
+  }
+    
+}
+ 
 class Document extends CoreModel {
 
   public $id = null;
+  public $created_on = null;
+  public $updated_on = null;
+  
   protected $rawData = null;
   protected $indexes = array();
 
@@ -946,6 +1079,8 @@ class Document extends CoreModel {
       $this->rawData = $dataRow['data'];
       $this->data = false;
       $this->id = $dataRow['id'];
+      $this->created_on = $dataRow['created_on'];
+      $this->updated_on = $dataRow['updated_on'];
     } else {
       $this->rawData = null;
       $this->data = array();
@@ -980,26 +1115,35 @@ class Document extends CoreModel {
         $this->beforeCreate();
         $this->_serialize();
         $sql = 'INSERT INTO '.$this->modelName.' ( data ) VALUES ( "'. $this->rawData .'" );';
+        $this->created_on = $this->updated_on = gmdate('Y-m-d H:i:s'); // Not official
         $statement = DB::Query($sql);
+        if($statement == false) return false;
         $result = DB::Query('SELECT last_insert_rowid() as last_insert_rowid')->fetch(); // Get the record's generated ID...
         $this->id = $result['last_insert_rowid'];
         Document::Reindex($this->modelName, $this->id);
         $this->afterCreate();
       } else { // Update
         $this->_serialize();
-        $sql = "UPDATE ".$this->modelName.' SET data="'.htmlentities( json_encode($this->data), ENT_QUOTES).'" WHERE id = '. $this->id .';';
+        $sql = "UPDATE ".$this->modelName.' SET data="'. $this->rawData .'" WHERE id = '. $this->id .';';
         $statement = DB::Query($sql);
+        if($statement == false) return false;
+        $this->updated_on = gmdate('Y-m-d H:i:s'); // Not official
         $index_changed = array_intersect($this->changedFields, array_keys(Document::GetIndexesFor($this->modelName)));
-        if(count($index_changed) > 0)  // Only if an indexed field has changed
+        if(count($index_changed) > 0) { // Only if an indexed field has changed {
+          // debug("Reindexing because these fields changed:");
+          // debug($index_changed);
           Document::Reindex($this->modelName, $this->id);
+        }
       }
       $this->changedFields = array();
       $this->isDirty = false;
       $this->isNew = false;
       $this->afterSave();
     }
-    return $this;
+    return true;
   }
+
+  // TODO: Add some sort of RELOAD method...
 
   // Warning: Like Han solo, this method doesn't fuck around, it will shoot first.
   public function destroy() {
@@ -1010,6 +1154,7 @@ class Document extends CoreModel {
   }
   
   public function _defineDocumentFromModel() {
+    // TODO: If this->belongsTo, then auto create the needed index(es)?
     Document::Define( $this->modelName, $this->indexes, false);
   }
   
@@ -1052,10 +1197,11 @@ class Document extends CoreModel {
   
   private static $_document_indexes_ = array();
   
-  public static function Register($class) {
-    $doc = new $class();
-    $doc->_defineDocumentFromModel();
-  }
+  // Think this goes away
+  // public static function Register($class) {
+  //   $doc = new $class();
+  //   $doc->_defineDocumentFromModel();
+  // }
   
   public static function Define($name, $indexes=array(), $createClass=true) {
     Document::$_document_indexes_[$name] = array_merge($indexes, array()); // a hokey way to clone an array
@@ -1063,11 +1209,20 @@ class Document extends CoreModel {
       eval("class ". $name ." extends Document {  }");
   }
   
+  // FIXME: Clean this up so that it runs in a single transaction/sql call???
+  // TODO: Call ShortStack::LoadAllModels??? 
   public static function InitializeDatabase() {
     // Loop through all the docs and create tables and index tables...
     foreach( Document::$_document_indexes_ as $docType => $indexes) {
-      $tableSQL = "CREATE TABLE IF NOT EXISTS ". $docType ." ( id INTEGER PRIMARY KEY, data TEXT, created_on TIMESTAMP, updated_on TIMESTAMP );";
+      $tableSQL = "CREATE TABLE IF NOT EXISTS ". $docType ." ( id INTEGER PRIMARY KEY, data TEXT, created_on DATETIME, updated_on DATETIME );";
       DB::Query( $tableSQL );
+      // Trigger to auto-insert created_on
+      $triggerSQL = "CREATE TRIGGER generate_". $docType ."_created_on AFTER INSERT ON ". $docType ." BEGIN UPDATE ". $docType ." SET created_on = DATETIME('NOW') WHERE rowid = new.rowid; END;";
+      DB::Query( $triggerSQL );
+      // Trigger to auto-insert updated_on
+      $triggerSQL = "CREATE TRIGGER generate_". $docType ."_updated_on AFTER UPDATE ON ". $docType ." BEGIN UPDATE ". $docType ." SET updated_on = DATETIME('NOW') WHERE rowid = new.rowid; END;";
+      DB::Query( $triggerSQL );
+      // Create index tables
       foreach ($indexes as $field=>$fType) {
         $indexSQL = "CREATE TABLE IF NOT EXISTS ". $docType ."_". $field ."_idx ( id INTEGER PRIMARY KEY, docid INTEGER, ". $field ." ". $fType ." );";
         DB::Query( $indexSQL );
@@ -1080,10 +1235,10 @@ class Document extends CoreModel {
     $docs = array();
     // Step one: Fetch all the documents to update...
     if($doctype != null) {
-      if(!array_key_exists($doctype, Document::$_document_indexes_)) {
-        $tmp = new $doctype();
-        $tmp->_defineDocumentFromModel();
-      }
+      // if(!array_key_exists($doctype, Document::$_document_indexes_)) { // don't think this matters anymore
+      //   $tmp = new $doctype();
+      //   $tmp->_defineDocumentFromModel();
+      // }
       if($id != null) {
         $sql = "SELECT * FROM ".$doctype." WHERE id = ". $id .";";
       } else {
@@ -1096,7 +1251,7 @@ class Document extends CoreModel {
     } else {
       // Do 'em all!
       foreach( Document::$_document_indexes_ as $docType => $indexes) {
-        $sql = "SELECT * FROM ".$doctype."";
+        $sql = "SELECT * FROM ".$doctype.";";
         $results = DB::FetchAll($sql);
         foreach ($results as $row) {
           $docs[] = new $doctype($row);
@@ -1115,8 +1270,6 @@ class Document extends CoreModel {
           $sql = "INSERT INTO ". $indexTable ." ( docid, ". $field ." ) VALUES (".$doc->id.', "'.htmlentities($doc->{$field}, ENT_QUOTES).'" );';
           $results = DB::Query($sql);
         }
-      } else {
-        echo "! No indexes for ". $doc->modelName ."\n";
       }
     }
   }
@@ -1157,6 +1310,10 @@ class Document extends CoreModel {
   }
 
   public static function GetIndexesFor($doctype) {
+    if(!array_key_exists($doctype, Document::$_document_indexes_)) {
+      $doc = new $doctype();
+      $doc->_defineDocumentFromModel();
+    }
     return Document::$_document_indexes_[$doctype];
   }
   
@@ -1164,51 +1321,83 @@ class Document extends CoreModel {
 
 
 class DocumentFinder extends CoreFinder {
-
-  // Document _buildSQL
-  protected function _buildSQL() {
+  private $nativeFields = array('id','created_on','updated_on');
+  
+  // FIXME: All these loops really need an optimization pass...
+  protected function _buildSQL($isCount=false) {
     // TODO: Implment OR logic...
-
     $all_order_cols = array();
+    $native_order_cols = array();
     foreach($this->order as $field=>$other) {
-      $all_order_cols[] = $this->_getIdxCol($field, false);
+      if(in_array($field, $this->nativeFields))
+        $native_order_cols[] = $field;
+      else
+        $all_order_cols[] = $this->_getIdxCol($field, false);
     }
+    
     $all_finder_cols = array();
+    $native_finder_cols = array();
     foreach($this->finder as $qry) {
-      $all_finder_cols []= $this->_getIdxCol($qry['col'], false);
+      $colname = $qry['col'];
+      if(in_array($colname, $this->nativeFields))
+        $native_finder_cols[] = $colname;
+      else
+        $all_finder_cols[] = $this->_getIdxCol($colname, false);
     }
     // Also for OR?
 
     $tables = array_merge(array($this->objtype), $all_order_cols);
-    $sql = "SELECT ". $this->objtype .".* FROM ". join(', ', $tables) ." ";
-
-    if(count($this->finder) > 0) {
+    //TODO: Should it select the id, data, and datetime(created_on, 'localtime')???
+    if($isCount)
+      $sql = "SELECT count(". $this->objtype .".id) as count FROM ". join(', ', $tables) ." ";
+    else
+      $sql = "SELECT ". $this->objtype .".* FROM ". join(', ', $tables) ." ";
+    
+    if(count($all_finder_cols) > 0) {
       $sql .= "WHERE ". $this->objtype .".id IN (";
       $sql .= "SELECT ". $all_finder_cols[0] .".docid FROM ". join(', ', $all_finder_cols). " ";
-      $sql .= "WHERE ";
+      $sql .= " WHERE ";
       $finders = array();
       foreach($this->finder as $qry) {
-        $finders []= " ". $this->_getIdxCol($qry['col'])  ." ". $qry['comp'] .' "'. htmlentities($qry['val'], ENT_QUOTES) .'" ';
+        if(!in_array($qry['col'], $this->nativeFields))
+          $finders []= " ". $this->_getIdxCol($qry['col'])  ." ". $qry['comp'] .' "'. htmlentities($qry['val'], ENT_QUOTES) .'" ';
       }
       $sql .= join(' AND ', $finders);
       $sql .= ") ";
     }
+    if(count($native_finder_cols) > 0) {
+      $sql .= (count($all_finder_cols) > 0) ? " AND " : " WHERE ";
+      $finders = array();
+      foreach($this->finder as $qry) {
+        if(in_array($qry['col'], $this->nativeFields))
+          $finders []= " ". $this->objtype .".". $qry['col']  ." ". $qry['comp'] .' "'. htmlentities($qry['val'], ENT_QUOTES) .'" ';
+      }
+      $sql .= join(' AND ', $finders);
+    }
+    if($isCount) return $sql.";";
+
     if(count($this->order) > 0) {
-      $sql .= "AND ";
+      $sql .= " AND ";
       $sortJoins = array();
+      $order_params = array();
       foreach ($this->order as $field => $dir) {
-        $sortJoins[] = $this->_getIdxCol($field, false) .".docid = ". $this->objtype .".id ";
+        if(!in_array($field, $this->nativeFields)) {
+          $sortJoins[] = $this->_getIdxCol($field, false) .".docid = ". $this->objtype .".id ";
+          $order_params[]= $this->_getIdxCol($field) ." ". $dir;
+        } else {
+          $order_params[]= $this->objtype .".". $field ." ". $dir;
+        }
       }
       $sql .= join(" AND ", $sortJoins);
       $sql .= " ORDER BY ";
-      $order_params = array();
-      foreach ($this->order as $field => $dir) {
-        $order_params[]= $this->_getIdxCol($field) ." ". $dir;
-      }
       $sql .= join(", ", $order_params);
     }
+
     if($this->limit != false && $this->limit > 0) {
       $sql .= " LIMIT ". $this->limit ." ";
+    }
+    if($this->offset != false && $this->offset > 0) {
+      $sql .= " OFFSET ". $this->offset ." ";
     }
     $sql .= ";";
 //    print_r($sql);
@@ -1222,6 +1411,60 @@ class DocumentFinder extends CoreFinder {
     }
     return $col; 
   }  
+}
+
+/*
+  Usage:
+
+  $pgr = new Pager( get('Post')->where('author')->eq('matt'));
+
+  
+*/
+
+class Pager implements IteratorAggregate {
+
+  protected $finder = null;
+  public $pageSize = 10;
+  public $currentPage = 0;
+  public $pages = 0;
+  
+  function __construct($finder, $pageSize=10, $params=array()) {
+    if($finder instanceof CoreFinder) {
+      $this->finder = $finder;
+    } else if(is_string($finder)) {
+      $this->finder = get($finder);
+    } else {
+      throw new Exception("You must specify a model name or finder object.");
+    }
+    $this->pageSize = $pageSize;
+    $this->pages = $this->count(); // ???
+    if(count($params) > 0) {
+      $this->fromParams($params);
+    }
+  }
+  
+  public function fromParams($params) {
+    list($key, $page) = array_slice($params, -2);
+    if($key == 'page' && is_numeric($page))
+      $this->currentPage = intVal($page);
+  }
+  
+  public function count() {
+    // Count the number of pages...
+    $this->finder->limit(0)->offset(0);
+    $total = $this->finder->count();
+    return ceil( $total / $this->pageSize );
+  }
+  
+  public function items() {
+    $this->finder->limit($this->pagesize)->offset($this->currentPage);
+    return $this->finder->fetch();
+  }
+  
+  public function getIterator() { // For using the finder as an array in foreach() statements
+    return new ArrayIterator( $this->item() );
+  }
+  
 }
 
 class Template {

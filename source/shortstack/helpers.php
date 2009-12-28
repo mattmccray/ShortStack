@@ -60,7 +60,7 @@ function mdl($objtype, $id=null) {// For use with documents
   if($id != null) {
     return Model::Get($objtype, $id);
   } else {
-    return Model::Find($doctype);
+    return Model::Find($objtype);
   }
 }
 

@@ -3,6 +3,9 @@
 class Document extends CoreModel {
 
   public $id = null;
+  public $created_on = null;
+  public $updated_on = null;
+  
   protected $rawData = null;
   protected $indexes = array();
 
@@ -12,6 +15,8 @@ class Document extends CoreModel {
       $this->rawData = $dataRow['data'];
       $this->data = false;
       $this->id = $dataRow['id'];
+      $this->created_on = $dataRow['created_on'];
+      $this->updated_on = $dataRow['updated_on'];
     } else {
       $this->rawData = null;
       $this->data = array();
@@ -46,26 +51,35 @@ class Document extends CoreModel {
         $this->beforeCreate();
         $this->_serialize();
         $sql = 'INSERT INTO '.$this->modelName.' ( data ) VALUES ( "'. $this->rawData .'" );';
+        $this->created_on = $this->updated_on = gmdate('Y-m-d H:i:s'); // Not official
         $statement = DB::Query($sql);
+        if($statement == false) return false;
         $result = DB::Query('SELECT last_insert_rowid() as last_insert_rowid')->fetch(); // Get the record's generated ID...
         $this->id = $result['last_insert_rowid'];
         Document::Reindex($this->modelName, $this->id);
         $this->afterCreate();
       } else { // Update
         $this->_serialize();
-        $sql = "UPDATE ".$this->modelName.' SET data="'.htmlentities( json_encode($this->data), ENT_QUOTES).'" WHERE id = '. $this->id .';';
+        $sql = "UPDATE ".$this->modelName.' SET data="'. $this->rawData .'" WHERE id = '. $this->id .';';
         $statement = DB::Query($sql);
+        if($statement == false) return false;
+        $this->updated_on = gmdate('Y-m-d H:i:s'); // Not official
         $index_changed = array_intersect($this->changedFields, array_keys(Document::GetIndexesFor($this->modelName)));
-        if(count($index_changed) > 0)  // Only if an indexed field has changed
+        if(count($index_changed) > 0) { // Only if an indexed field has changed {
+          // debug("Reindexing because these fields changed:");
+          // debug($index_changed);
           Document::Reindex($this->modelName, $this->id);
+        }
       }
       $this->changedFields = array();
       $this->isDirty = false;
       $this->isNew = false;
       $this->afterSave();
     }
-    return $this;
+    return true;
   }
+
+  // TODO: Add some sort of RELOAD method...
 
   // Warning: Like Han solo, this method doesn't fuck around, it will shoot first.
   public function destroy() {
@@ -76,6 +90,7 @@ class Document extends CoreModel {
   }
   
   public function _defineDocumentFromModel() {
+    // TODO: If this->belongsTo, then auto create the needed index(es)?
     Document::Define( $this->modelName, $this->indexes, false);
   }
   
@@ -118,10 +133,11 @@ class Document extends CoreModel {
   
   private static $_document_indexes_ = array();
   
-  public static function Register($class) {
-    $doc = new $class();
-    $doc->_defineDocumentFromModel();
-  }
+  // Think this goes away
+  // public static function Register($class) {
+  //   $doc = new $class();
+  //   $doc->_defineDocumentFromModel();
+  // }
   
   public static function Define($name, $indexes=array(), $createClass=true) {
     Document::$_document_indexes_[$name] = array_merge($indexes, array()); // a hokey way to clone an array
@@ -129,11 +145,20 @@ class Document extends CoreModel {
       eval("class ". $name ." extends Document {  }");
   }
   
+  // FIXME: Clean this up so that it runs in a single transaction/sql call???
+  // TODO: Call ShortStack::LoadAllModels??? 
   public static function InitializeDatabase() {
     // Loop through all the docs and create tables and index tables...
     foreach( Document::$_document_indexes_ as $docType => $indexes) {
-      $tableSQL = "CREATE TABLE IF NOT EXISTS ". $docType ." ( id INTEGER PRIMARY KEY, data TEXT, created_on TIMESTAMP, updated_on TIMESTAMP );";
+      $tableSQL = "CREATE TABLE IF NOT EXISTS ". $docType ." ( id INTEGER PRIMARY KEY, data TEXT, created_on DATETIME, updated_on DATETIME );";
       DB::Query( $tableSQL );
+      // Trigger to auto-insert created_on
+      $triggerSQL = "CREATE TRIGGER generate_". $docType ."_created_on AFTER INSERT ON ". $docType ." BEGIN UPDATE ". $docType ." SET created_on = DATETIME('NOW') WHERE rowid = new.rowid; END;";
+      DB::Query( $triggerSQL );
+      // Trigger to auto-insert updated_on
+      $triggerSQL = "CREATE TRIGGER generate_". $docType ."_updated_on AFTER UPDATE ON ". $docType ." BEGIN UPDATE ". $docType ." SET updated_on = DATETIME('NOW') WHERE rowid = new.rowid; END;";
+      DB::Query( $triggerSQL );
+      // Create index tables
       foreach ($indexes as $field=>$fType) {
         $indexSQL = "CREATE TABLE IF NOT EXISTS ". $docType ."_". $field ."_idx ( id INTEGER PRIMARY KEY, docid INTEGER, ". $field ." ". $fType ." );";
         DB::Query( $indexSQL );
@@ -146,10 +171,10 @@ class Document extends CoreModel {
     $docs = array();
     // Step one: Fetch all the documents to update...
     if($doctype != null) {
-      if(!array_key_exists($doctype, Document::$_document_indexes_)) {
-        $tmp = new $doctype();
-        $tmp->_defineDocumentFromModel();
-      }
+      // if(!array_key_exists($doctype, Document::$_document_indexes_)) { // don't think this matters anymore
+      //   $tmp = new $doctype();
+      //   $tmp->_defineDocumentFromModel();
+      // }
       if($id != null) {
         $sql = "SELECT * FROM ".$doctype." WHERE id = ". $id .";";
       } else {
@@ -162,7 +187,7 @@ class Document extends CoreModel {
     } else {
       // Do 'em all!
       foreach( Document::$_document_indexes_ as $docType => $indexes) {
-        $sql = "SELECT * FROM ".$doctype."";
+        $sql = "SELECT * FROM ".$doctype.";";
         $results = DB::FetchAll($sql);
         foreach ($results as $row) {
           $docs[] = new $doctype($row);
@@ -181,8 +206,6 @@ class Document extends CoreModel {
           $sql = "INSERT INTO ". $indexTable ." ( docid, ". $field ." ) VALUES (".$doc->id.', "'.htmlentities($doc->{$field}, ENT_QUOTES).'" );';
           $results = DB::Query($sql);
         }
-      } else {
-        echo "! No indexes for ". $doc->modelName ."\n";
       }
     }
   }
@@ -223,6 +246,10 @@ class Document extends CoreModel {
   }
 
   public static function GetIndexesFor($doctype) {
+    if(!array_key_exists($doctype, Document::$_document_indexes_)) {
+      $doc = new $doctype();
+      $doc->_defineDocumentFromModel();
+    }
     return Document::$_document_indexes_[$doctype];
   }
   
@@ -230,51 +257,83 @@ class Document extends CoreModel {
 
 
 class DocumentFinder extends CoreFinder {
-
-  // Document _buildSQL
-  protected function _buildSQL() {
+  private $nativeFields = array('id','created_on','updated_on');
+  
+  // FIXME: All these loops really need an optimization pass...
+  protected function _buildSQL($isCount=false) {
     // TODO: Implment OR logic...
-
     $all_order_cols = array();
+    $native_order_cols = array();
     foreach($this->order as $field=>$other) {
-      $all_order_cols[] = $this->_getIdxCol($field, false);
+      if(in_array($field, $this->nativeFields))
+        $native_order_cols[] = $field;
+      else
+        $all_order_cols[] = $this->_getIdxCol($field, false);
     }
+    
     $all_finder_cols = array();
+    $native_finder_cols = array();
     foreach($this->finder as $qry) {
-      $all_finder_cols []= $this->_getIdxCol($qry['col'], false);
+      $colname = $qry['col'];
+      if(in_array($colname, $this->nativeFields))
+        $native_finder_cols[] = $colname;
+      else
+        $all_finder_cols[] = $this->_getIdxCol($colname, false);
     }
     // Also for OR?
 
     $tables = array_merge(array($this->objtype), $all_order_cols);
-    $sql = "SELECT ". $this->objtype .".* FROM ". join(', ', $tables) ." ";
-
-    if(count($this->finder) > 0) {
+    //TODO: Should it select the id, data, and datetime(created_on, 'localtime')???
+    if($isCount)
+      $sql = "SELECT count(". $this->objtype .".id) as count FROM ". join(', ', $tables) ." ";
+    else
+      $sql = "SELECT ". $this->objtype .".* FROM ". join(', ', $tables) ." ";
+    
+    if(count($all_finder_cols) > 0) {
       $sql .= "WHERE ". $this->objtype .".id IN (";
       $sql .= "SELECT ". $all_finder_cols[0] .".docid FROM ". join(', ', $all_finder_cols). " ";
-      $sql .= "WHERE ";
+      $sql .= " WHERE ";
       $finders = array();
       foreach($this->finder as $qry) {
-        $finders []= " ". $this->_getIdxCol($qry['col'])  ." ". $qry['comp'] .' "'. htmlentities($qry['val'], ENT_QUOTES) .'" ';
+        if(!in_array($qry['col'], $this->nativeFields))
+          $finders []= " ". $this->_getIdxCol($qry['col'])  ." ". $qry['comp'] .' "'. htmlentities($qry['val'], ENT_QUOTES) .'" ';
       }
       $sql .= join(' AND ', $finders);
       $sql .= ") ";
     }
+    if(count($native_finder_cols) > 0) {
+      $sql .= (count($all_finder_cols) > 0) ? " AND " : " WHERE ";
+      $finders = array();
+      foreach($this->finder as $qry) {
+        if(in_array($qry['col'], $this->nativeFields))
+          $finders []= " ". $this->objtype .".". $qry['col']  ." ". $qry['comp'] .' "'. htmlentities($qry['val'], ENT_QUOTES) .'" ';
+      }
+      $sql .= join(' AND ', $finders);
+    }
+    if($isCount) return $sql.";";
+
     if(count($this->order) > 0) {
-      $sql .= "AND ";
+      $sql .= " AND ";
       $sortJoins = array();
+      $order_params = array();
       foreach ($this->order as $field => $dir) {
-        $sortJoins[] = $this->_getIdxCol($field, false) .".docid = ". $this->objtype .".id ";
+        if(!in_array($field, $this->nativeFields)) {
+          $sortJoins[] = $this->_getIdxCol($field, false) .".docid = ". $this->objtype .".id ";
+          $order_params[]= $this->_getIdxCol($field) ." ". $dir;
+        } else {
+          $order_params[]= $this->objtype .".". $field ." ". $dir;
+        }
       }
       $sql .= join(" AND ", $sortJoins);
       $sql .= " ORDER BY ";
-      $order_params = array();
-      foreach ($this->order as $field => $dir) {
-        $order_params[]= $this->_getIdxCol($field) ." ". $dir;
-      }
       $sql .= join(", ", $order_params);
     }
+
     if($this->limit != false && $this->limit > 0) {
       $sql .= " LIMIT ". $this->limit ." ";
+    }
+    if($this->offset != false && $this->offset > 0) {
+      $sql .= " OFFSET ". $this->offset ." ";
     }
     $sql .= ";";
 //    print_r($sql);

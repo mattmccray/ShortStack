@@ -57,7 +57,7 @@ $shortstack_config = $config['shortstack'];
 
 
 try {
-  include('../source/shortstack-dev.php');
+  include_once('../source/shortstack-dev.php');
 } catch (EmptyDbException $e) {
 
   ShortStack::InitializeDatabase();
@@ -65,5 +65,6 @@ try {
 }
 
 error_reporting(E_ALL & ~E_NOTICE & ~E_DEPRECATED ); //& ~E_WARNING
+
 require_once('simpletest/autorun.php');
 
