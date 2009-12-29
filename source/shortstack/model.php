@@ -1,15 +1,16 @@
 <?php
 
-//TODO: Consolidate Model and CoreModel
 //TODO: Figure out what to do for hasMany relationships onDestroy (for throughs, kill the joins. Otherwise?)
 
-class CoreModel {
+class Model {
 
     public $modelName = null;
     
     protected $data = false;
     protected $isNew = false;
     protected $isDirty = false;
+
+    protected $schema = array();
     protected $hasMany = array();
     protected $belongsTo = array();
     protected $changedFields = array();
@@ -33,7 +34,6 @@ class CoreModel {
     }
 
     function __set($key, $value) {
-      // TODO: Validate against schema to ensure fields exist?
       $value = stripslashes($value);
       if(@ $this->data[$key] != htmlentities($value, ENT_QUOTES)) {
         $this->data[$key] = $value;
@@ -43,7 +43,6 @@ class CoreModel {
     }
     
     function __call( $method, $args ) {
-      // TODO: Support relationships here...
       if(array_key_exists($method, $this->hasMany)) {
         return $this->_handleHasMany($method, $args);
       }
@@ -91,16 +90,16 @@ class CoreModel {
       else if(array_key_exists('model', $def)) {
         $mdlClass = $def['model'];
         $fk = strtolower($mdlClass)."_id";
-        return Model::Get($mdlClass, $this->$fk);
+        return Model::Get($mdlClass, $this->{$fk});
       } else {
         throw new Exception("A relationship has to be defined as a model or document");
       }
     }
     
     protected function _handleRelationshipBuilder($mode, $modelName, $args) {
+      //TODO: Type and schema checking...
       $fk = strtolower($this->modelName)."_id";
       if($mode == 'new') {
-        //TODO: Type and schema checking...
         $mdl = new $modelName();
         $mdl->{$fk} = $this->id;
         if(count($args) > 0 && is_array($args[0])) {
@@ -109,13 +108,11 @@ class CoreModel {
         return $mdl;
       }
       else if($mode == 'add') {
-        //TODO: Type and schema checking...
         list($mdl) = $args;
         $mdl->{$fk} = $this->id;
         $mdl->save();
       }
       else if($mode == 'set') {
-        //TODO: Type and schema checking...
         list($mdl) = $args;
         $this->{$fk} = $mdl->id;
       }
@@ -143,10 +140,57 @@ class CoreModel {
     public function hasChanged($key) {
       return in_array($key, $this->changedFields);
     }
+    
+    public function getChangedValues() {
+      $valid_atts = array_keys( $this->schema );
+      $cleanChangedFields = array();
+      $results = array();
+      foreach($this->changedFields as $fieldname) {
+        if(in_array($fieldname, $valid_atts)) {
+          // Stringifies everything, is this really ideal?
+          $results[$fieldname] = '"'.htmlentities($this->$fieldname, ENT_QUOTES).'"';
+          $cleanChangedFields[] = $fieldname;
+        }
+      }
+      $this->changedFields = $cleanChangedFields;
+      return $results;
+    }
 
-    // Override these two
-    public function save() {}
-    public function destroy(){}
+    public function save() {
+      $result = true;
+      if($this->isDirty) {
+        $this->beforeSave();
+        if($this->isNew) {
+          // Create
+          $this->beforeCreate();
+          $result = $this->_handleSqlInsert();
+          $this->afterCreate();
+        } else {
+          // Update
+          $result = $this->_handleSqlUpdate();
+        }
+        $this->changedFields = array();
+        $this->isDirty = false;
+        $this->isNew = false;
+        $this->afterSave();
+      }
+      return $result;
+    }
+    
+    public function destroy(){
+      $this->beforeDestroy();
+      $thisDel = $this->_handleSqlDelete();
+      $relDel = $this->_handleRelatedSqlDelete();
+      $this->afterDestroy();
+      return ($thisDel && $relDel);
+    }
+
+    // WARNING: This doesn't trigger the callbacks!
+    public function kill(){
+      $thisDel = $this->_handleSqlDelete();
+      $relDel = $this->_handleRelatedSqlDelete();
+      return ($thisDel && $relDel);
+    }
     
     // Callbacks
     protected function beforeSave() {}
@@ -155,26 +199,80 @@ class CoreModel {
     protected function afterCreate() {}
     protected function beforeDestroy() {}
     protected function afterDestroy() {}
-    protected function beforeSerialize() {}
-    protected function afterSerialize() {}
 
-    protected function getChangedValues() {
-      $results = array();
-      foreach($this->changedFields as $key=>$fieldname) {
-        $results[$fieldname] = $this->$fieldname;
+    // Override these in subclasses...
+    protected function _handleSqlCreate() {
+      $sql = "CREATE TABLE IF NOT EXISTS ";
+      $sql.= $this->modelName ." ( ";
+      $cols = array();
+      $modelColumns = $this->schema;
+      if(!array_key_exists('id',$this->schema))
+        $modelColumns["id"] = 'INTEGER PRIMARY KEY';
+      foreach($modelColumns as $name=>$def) {
+        $cols[] = $name ." ". $def;
       }
-      return $results;
+      $sql.= join($cols, ', ');
+      $sql.= " );";
+      $statement = DB::Query( $sql );
+      // Trigger to auto-insert created_on
+      if(array_key_exists('created_on', $this->schema)) {
+        $triggerSQL = "CREATE TRIGGER generate_". $this->modelName ."_created_on AFTER INSERT ON ". $this->modelName ." BEGIN UPDATE ". $this->modelName ." SET created_on = DATETIME('NOW') WHERE rowid = new.rowid; END;";
+        if(DB::Query( $triggerSQL ) == false) $statement = false;
+      }
+      // Trigger to auto-insert updated_on
+      if(array_key_exists('updated_on', $this->schema)) {
+        $triggerSQL = "CREATE TRIGGER generate_". $this->modelName ."_updated_on AFTER UPDATE ON ". $this->modelName ." BEGIN UPDATE ". $this->modelName ." SET updated_on = DATETIME('NOW') WHERE rowid = new.rowid; END;";
+        if(DB::Query( $triggerSQL ) == false) $statement = false;
+      }
+      return ($statement != false);
     }
     
-    protected function _handleSqlCreate() {
-    }
     protected function _handleSqlInsert() {
+      $values = $this->getChangedValues();
+      $sql = "INSERT INTO ".$this->modelName." (".join($this->changedFields, ', ').") VALUES (".join($values, ', ').");";
+      $statement = DB::Query($sql);
+      if($statement == false) return false;
+      // Get the record's generated ID...
+      $result = DB::Query('SELECT last_insert_rowid() as last_insert_rowid')->fetch();
+      $this->data['id'] = $result['last_insert_rowid'];
+      return true;
     }
+    
     protected function _handleSqlUpdate() {
+      $values = $this->getChangedValues();
+      $fields = array();
+      foreach($values as $field=>$value) {
+        $fields[] = $field." = ".$value;
+      }
+      $sql = "UPDATE ".$this->modelName." SET ". join($fields, ", ") ." WHERE id = ". $this->id .";";
+      $statement = DB::Query($sql);
+      return ($statement != false);
     }
+    
     protected function _handleSqlDelete() {
+      $sql = "DELETE FROM ".$this->modelName." WHERE id = ". $this->id .";";
+      $stmt = DB::Query($sql);
+      return ($stmt != false);
     }
+    
     protected function _handleRelatedSqlDelete() {
+      $fk = strtolower($this->modelName)."_id";
+      foreach ($this->hasMany as $methodName => $relDef) {
+        $rule = (array_key_exists('cascade', $relDef)) ? $relDef['cascade'] : 'delete';
+        if(array_key_exists('through', $relDef)) {
+          $joinerCls = $relDef['through'];
+          get($joinerCls)->where($fk)->eq($this->id)->destroy();
+        }
+        else {
+          $mdlCls = (array_key_exists('document', $relDef)) ? $relDef['document'] : $relDef['model'];
+          $matches = get($mdlCls)->where($fk)->eq($this->id);
+          if($rule == 'delete')
+            $matches->destroy();
+          else// if($rule == 'nullify') // Could also use 'cascade'=>'ignore'???
+            $matches->update(array($fk=>null)); // nullifies
+        }
+      }
+      return true;
     }
     
     public function to_array($exclude=array()) {
@@ -188,22 +286,52 @@ class CoreModel {
     }
     
     public function to_json($exclude=array()) {
-      return CoreModel::toJSON( $this->to_array($exclude) );
+      return Model::toJSON( $this->to_array($exclude) );
     }
-      
-    // = Static methods / variables =    
+    
+    public function createTableForModel() {
+      return $this->_handleSqlCreate();
+    }
+
+// Static Helper Methods...
+
+    public static $IsModel = true;
+    public static $IsDocument = false;
+
+    public static function Get($modelName, $id) {
+      $sql = "SELECT * FROM ".$modelName." WHERE id = ". $id ." LIMIT 1;";
+      $results = DB::FetchAll($sql);
+      return new $modelName( $results[0] );
+    }
+
+    public static function Find($modelName) {
+      return new ModelFinder($modelName);
+    }
+
+    // Does NOT fire callbacks...
+    public static function Remove($modelName, $id) {
+      $inst = self::Get($modelName, $id);
+      return $inst->kill();
+    }
+
+    static public function Count($className) {
+      $sql = "SELECT count(id) as count FROM ".$className.";";
+      $results = DB::FetchAll($sql);
+      return @(integer)$results[0]['count'];
+    }
+
     static public function toJSON($obj) {
       if(is_array($obj)) {
         $data = array();
         foreach($obj as $idx=>$mdl) {
-          if($mdl instanceof CoreModel)
+          if($mdl instanceof Model)
             $data[] = $mdl->to_array();
           else
             $data[$idx] = $mdl;
         }
         return json_encode($data);
         
-      } else if( $obj instanceof CoreModel ) {
+      } else if( $obj instanceof Model ) {
         return json_encode($obj->to_array());
       
       } else {
@@ -212,172 +340,6 @@ class CoreModel {
     }
 }
 
-
-class Model extends CoreModel {
-  
-  protected $schema = array();
-  
-  // public function updateValues($values=array()) {
-  //   $valid_atts = array_keys( $this->schema );
-  //   foreach($values as $key=>$value) {
-  //     if(in_array($key, $valid_atts)) $this->$key = $value;
-  //   }
-  //   return $this;
-  // }
-  
-  protected function getChangedValues() {
-    $valid_atts = array_keys( $this->schema );
-    $cleanChangedFields = array();
-    $results = array();
-    foreach($this->changedFields as $fieldname) {
-      if(in_array($fieldname, $valid_atts)) {
-        $results[$fieldname] = '"'.htmlentities($this->$fieldname, ENT_QUOTES).'"';
-        $cleanChangedFields[] = $fieldname;
-      }
-    }
-    $this->changedFields = $cleanChangedFields;
-    return $results;
-  }
-  
-  public function save() {
-    if($this->isDirty) {
-      $this->beforeSave();
-      if($this->isNew) {
-        // Create
-        $this->beforeCreate();
-        $values = $this->getChangedValues();
-        $sql = "INSERT INTO ".$this->modelName." (".join($this->changedFields, ', ').") VALUES (".join($values, ', ').");";
-        $statement = DB::Query($sql);
-        if($statement == false) return false;
-        // Get the record's generated ID...
-        $result = DB::Query('SELECT last_insert_rowid() as last_insert_rowid')->fetch();
-        $this->data['id'] = $result['last_insert_rowid'];
-        $this->afterCreate();
-      } else {
-        // Update
-        $values = $this->getChangedValues();
-        $fields = array();
-        foreach($values as $field=>$value) {
-          $fields[] = $field." = ".$value;
-        }
-        $sql = "UPDATE ".$this->modelName." SET ". join($fields, ", ") ." WHERE id = ". $this->id .";";
-        $statement = DB::Query($sql);
-        if($statement == false) return false;
-      }
-      $this->changedFields = array();
-      $this->isDirty = false;
-      $this->isNew = false;
-      $this->afterSave();
-    }
-    return true;
-  }
-  
-  // Warning: Like Han solo, this method doesn't fuck around, it will shoot first.
-  public function destroy() {
-    $this->beforeDestroy();
-    Model::Remove($this->modelName, $this->id);
-    $this->afterDestroy();
-    return $this;
-  }
-  
-  // = SQL Builder Helper Methods =
-  
-  public function _createTableForModel() {
-    return self::CreateTableForModel($this->modelName, $this);
-  }
-  
-  
-   static public function CreateTableForModel($modelName, $mdlInst=false) {
-     $sql = "CREATE TABLE IF NOT EXISTS ";
-     $sql.= $modelName ." ( ";
-     $cols = array();
-     if(! $mdlInst) $mdlInst = new $modelName;
-
-     $modelColumns = $mdlInst->schema;
-     $modelColumns["id"] = 'INTEGER PRIMARY KEY';
-     
-     foreach($modelColumns as $name=>$def) {
-       $cols[] = $name ." ". $def;
-     }
-     $sql.= join($cols, ', ');
-     $sql.= " );";
-     
-     //FIXME: If create_on or updated_on are in schema, create triggers to auto-update them.
-
-     return DB::Query( $sql );
-   }
-
-   public static function Get($modelName, $id) {
-     $sql = "SELECT * FROM ".$modelName." WHERE id = ". $id ." LIMIT 1;";
-     $results = DB::FetchAll($sql);
-     $mdls = array();
-     foreach ($results as $row) {
-       $mdls[] = new $modelName($row);
-     }
-     return @$mdls[0];
-   }
-   
-   public static function Find($modelName) {
-     return new ModelFinder($modelName);
-   }
-
-   // Does NOT fire callbacks...
-   public static function Remove($modelName, $id) {
-     $sql = "DELETE FROM ".$modelName." WHERE id = ". $id .";";
-     DB::Query($sql);
-   }
-
-   static public function Count($className) {
-     $sql = "SELECT count(id) as count FROM ".$className.";";
-     $statement = DB::Query($sql);
-     if($statement) {
-       $results = $statement->fetchAll(); // PDO::FETCH_ASSOC ???
-       return @(integer)$results[0]['count'];
-     } else { // Throw an ERROR?
-       return 0;
-     }
-   }
-}
-
-
-class ModelFinder extends CoreFinder {
-
-  // Model _buildSQL
-  protected function _buildSQL($isCount=false) {
-    if($isCount)
-      $sql = "SELECT count(id) as count FROM ". $this->objtype ." ";
-    else
-      $sql = "SELECT * FROM ". $this->objtype ." ";
-    // TODO: Implment OR logic...
-    if(count($this->finder) > 0) {
-      $sql .= "WHERE ";
-      $finders = array();
-      foreach($this->finder as $qry) {
-        $finders []= $qry['col']." ".$qry['comp'].' "'. htmlentities($qry['val'],ENT_QUOTES).'"';
-      }
-      $sql .= join(" AND ", $finders);
-    }
-    if($isCount) return $sql.";";
-
-    if(count($this->order) > 0) {
-      $sql .= " ORDER BY ";
-      $order_params = array();
-      foreach ($this->order as $field => $dir) {
-        $order_params[]= $field." ".$dir;
-      }
-      $sql .= join(", ", $order_params);
-    }
-    if($this->limit != false && $this->limit > 0) {
-      $sql .= " LIMIT ". $this->limit ." ";
-    }
-    if($this->offset != false && $this->offset > 0) {
-      $sql .= " OFFSET ". $this->offset ." ";
-    }
-    $sql .= " ;";
-    return $sql;
-  }
-
-}
 
 class Joiner extends Model {
   

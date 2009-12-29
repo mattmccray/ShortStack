@@ -12,7 +12,6 @@ class User extends Model {
 
   protected $hasMany = array(
     'posts' => array('document'=>'Post'),
-    'pages' => array('model'=>'Page'),
   );
   
   static public function authenticate($username, $password) {

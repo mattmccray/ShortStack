@@ -3,9 +3,11 @@
 class Comment extends Document {
   $indexes = array(
     'post_id'      => 'INTEGER',
+    'user_id'      => 'INTEGER',
   );
   $belongsTo = array(
-    'document'=>'Post'
+    'post' => array('document'=>'Post'),
+    'user' => array('document'=>'User'),
   );
   
   protected beforeSave() {

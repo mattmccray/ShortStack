@@ -1,6 +1,6 @@
 <?php
 
-class CoreFinder implements IteratorAggregate {
+class ModelFinder implements IteratorAggregate {
   
   protected $objtype;
   protected $matcher = false;
@@ -130,8 +130,39 @@ class CoreFinder implements IteratorAggregate {
     return $items;
   }
   
-  protected function _buildSQL() {
-    throw new Exception("_buildSQL() has not been implemented!");
+  // Model _buildSQL
+  protected function _buildSQL($isCount=false) {
+    if($isCount)
+      $sql = "SELECT count(id) as count FROM ". $this->objtype ." ";
+    else
+      $sql = "SELECT * FROM ". $this->objtype ." ";
+    // TODO: Implment OR logic...
+    if(count($this->finder) > 0) {
+      $sql .= "WHERE ";
+      $finders = array();
+      foreach($this->finder as $qry) {
+        $finders []= $qry['col']." ".$qry['comp'].' "'. htmlentities($qry['val'],ENT_QUOTES).'"';
+      }
+      $sql .= join(" AND ", $finders);
+    }
+    if($isCount) return $sql.";";
+
+    if(count($this->order) > 0) {
+      $sql .= " ORDER BY ";
+      $order_params = array();
+      foreach ($this->order as $field => $dir) {
+        $order_params[]= $field." ".$dir;
+      }
+      $sql .= join(", ", $order_params);
+    }
+    if($this->limit != false && $this->limit > 0) {
+      $sql .= " LIMIT ". $this->limit ." ";
+    }
+    if($this->offset != false && $this->offset > 0) {
+      $sql .= " OFFSET ". $this->offset ." ";
+    }
+    $sql .= " ;";
+    return $sql;
   }
 }
 

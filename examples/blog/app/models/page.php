@@ -6,14 +6,14 @@ class Page extends Document {
     'user_id'=>'INTEGER',
   );
   $belongsTo = array(
-    'document'=>'User'
+    'user' = array('document'=>'User')
   );
 
-  protected beforeCreate() {
+  protected function beforeCreate() {
     $this->slug = slugify($this->title);
   }
   
-  protected beforeSave() {
+  protected function beforeSave() {
     if( $this->hasChanged('body_src') ){
       $this->body = markdown($this->body_src);
     }

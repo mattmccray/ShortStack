@@ -4,12 +4,12 @@ A simple, easily customized, MVC framework for PHP. Currently built for use with
 
 * DB Abstraction Layer (over PDO)
 * Models with `hasMany`/`belongsTo` (and `hasMany(through)`) relationships
-* Documents (or schema-less models, loosely based on the [friendfeed][] design) can mix and match with Models
+* `Document` Models (or schema-less models, loosely based on the [friendfeed][] design)
 * Controllers/Actions (hybrid)
 * Templates
 * Pager helper class
 * View Caching
-* Core Framework < 50k in a single `.php` file
+* Core Framework < 50kb in a single `.php` file
 
   [friendfeed]: http://bret.appspot.com/entry/how-friendfeed-uses-mysql
 
@@ -38,7 +38,7 @@ Example:
     }
 
 
-Initialize the DB:
+Initialize the DB (first-time):
 
     ShortStack::InitializeDatabase();
 
@@ -58,7 +58,8 @@ Create a Post:
 Get Post With ID of 1:
 
     $post = doc('Post', 1);
-
+      // -or-
+    $post = Document::Get('Post', 1);
 
 Query Posts:
 
@@ -90,7 +91,13 @@ Destroy Post:
 
     $post->destroy();
     doc('Post', 1)->destroy()
-    Document::Destroy('Post', 1);
+
+
+Remove Post without firing callbacks:
+
+    $post->kill();
+      // - or -
+    Document::Remove('Post', 1);
 
 
 Bulk Destroy Posts -- Kinda dangerous:
@@ -101,8 +108,6 @@ Bulk Destroy Posts -- Kinda dangerous:
 
 ## Todos
 
-* Consolidate `CoreModel` and `Model`
-* Consolidate `CoreFinder` and `ModelFinder`
 * Use PDO prepared statements where possible?
 * Better error handling.
 * Remove all the @ cruft

@@ -51,16 +51,19 @@ class TestOfDocument extends UnitTestCase {
   
   function tearDown() {
     doc('User')->destroy();
-    doc('Post')->destroy();
-    doc('Comment')->destroy();
-    $this->user->destroy();
-    mdl('Tagging')->destroy();
+    // All of these should cascade from user->destroy():
+      // doc('Post')->destroy();
+      // doc('Comment')->destroy();
+      // mdl('Tagging')->destroy();
+    
     mdl('Tag')->destroy();
   }
   
 
   function testDocCreate() {
     
+    $this->assertEqual( Model::Count('User'), 1 );
+    $this->assertEqual( Document::Count('Post'), 6 );
     $this->assertEqual( doc('Post')->count(), 6 );
     $this->assertEqual( get('Comment')->count(), 6*2 );
     $this->assertEqual( get('Tag')->count(), 1 );

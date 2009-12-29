@@ -6,9 +6,8 @@ class User extends Document {
     'password' => 'STRING',
   );
   $hasMany = array(
-    'document'=>'Page',
-    'document'=>'Post',
-    'document'=>'Comment',
+    'pages' => array('document'=>'Page'),
+    'posts' => array('document'=>'Post'),
+    'comments' => array('document'=>'Comment'),
   );
-  
 }

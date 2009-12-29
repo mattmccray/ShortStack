@@ -8,7 +8,7 @@ class Post extends Document {
     'publish_date' => 'TIMESTAMP',
   );
   protected $hasMany = array(
-    'comments' => array('document'=>'Comment', 'cascade'=>'delete'),// or nullify
+    'comments' => array('document'=>'Comment', 'cascade'=>'delete'),// or nullify, defaults to delete
     'tags' => array('through' => 'Tagging'),
   );
   protected $belongsTo = array(

@@ -47,15 +47,9 @@ class ShortStack {
     foreach($modelnames as $modelName) {
       $mdl = new $modelName;
       if($mdl instanceof Model) {
-        $res = $mdl->_createTableForModel();
-        $res->execute();
-      
-      } else if($mdl instanceof Document) {
-        $res = $mdl->_defineDocumentFromModel();
-        $needDocInit = true;
+        $results = $mdl->createTableForModel();
       }
     }
-    if($needDocInit) Document::InitializeDatabase();
     return $modelnames;
   }
   // File paths...

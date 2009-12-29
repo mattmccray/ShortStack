@@ -16,7 +16,7 @@ class Pager implements IteratorAggregate {
   public $pages = 0;
   
   function __construct($finder, $pageSize=10, $params=array()) {
-    if($finder instanceof CoreFinder) {
+    if($finder instanceof ModelFinder) {
       $this->finder = $finder;
     } else if(is_string($finder)) {
       $this->finder = get($finder);

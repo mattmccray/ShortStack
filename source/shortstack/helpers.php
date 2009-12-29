@@ -45,7 +45,7 @@ function getBaseUri() { // Used by the Dispatcher
 function debug($obj) {
   echo "<pre>";
   print_r($obj);
-  echo "</pre>";
+  echo "</pre>\n";
 }
 
 function doc($doctype, $id=null) {// For use with documents
@@ -65,12 +65,26 @@ function mdl($objtype, $id=null) {// For use with documents
 }
 
 function get($modelName, $id=null) {
-  $c = new ReflectionClass($modelName);
-  if($c->isSubclassOf('Model')) {
-    return mdl($modelName, $id);
-  } else {
-    // Do another subclass test??
+  if($modelName::$IsDocument) {
     return doc($modelName, $id);
   }
+  else {
+    return mdl($modelName, $id);
+  }
+
+  // $inst = new $modelName();
+  // if($inst instanceof Document) {
+  //   return doc($modelName, $id);
+  // }
+  // else {
+  //   return mdl($modelName, $id);
+  // }
+
+  // $c = new ReflectionClass($modelName);
+  // if($c->isSubclassOf('Document')) {
+  //   return doc($modelName, $id);
+  // } else {
+  //   return mdl($modelName, $id);
+  // }
 }
 

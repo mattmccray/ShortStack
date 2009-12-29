@@ -1,6 +1,6 @@
 <?php
  
-// ShortStack v0.9.6b3
+// ShortStack v0.9.6
 // By M@ McCray
 // http://github.com/darthapo/ShortStack
 
@@ -52,15 +52,9 @@ class ShortStack {
     foreach($modelnames as $modelName) {
       $mdl = new $modelName;
       if($mdl instanceof Model) {
-        $res = $mdl->_createTableForModel();
-        $res->execute();
-      
-      } else if($mdl instanceof Document) {
-        $res = $mdl->_defineDocumentFromModel();
-        $needDocInit = true;
+        $results = $mdl->createTableForModel();
       }
     }
-    if($needDocInit) Document::InitializeDatabase();
     return $modelnames;
   }
   // File paths...
@@ -131,7 +125,7 @@ function getBaseUri() { // Used by the Dispatcher
 function debug($obj) {
   echo "<pre>";
   print_r($obj);
-  echo "</pre>";
+  echo "</pre>\n";
 }
 
 function doc($doctype, $id=null) {// For use with documents
@@ -151,13 +145,27 @@ function mdl($objtype, $id=null) {// For use with documents
 }
 
 function get($modelName, $id=null) {
-  $c = new ReflectionClass($modelName);
-  if($c->isSubclassOf('Model')) {
-    return mdl($modelName, $id);
-  } else {
-    // Do another subclass test??
+  if($modelName::$IsDocument) {
     return doc($modelName, $id);
   }
+  else {
+    return mdl($modelName, $id);
+  }
+
+  // $inst = new $modelName();
+  // if($inst instanceof Document) {
+  //   return doc($modelName, $id);
+  // }
+  // else {
+  //   return mdl($modelName, $id);
+  // }
+
+  // $c = new ReflectionClass($modelName);
+  // if($c->isSubclassOf('Document')) {
+  //   return doc($modelName, $id);
+  // } else {
+  //   return mdl($modelName, $id);
+  // }
 }
 
 
@@ -466,7 +474,7 @@ class DB {
     }
   }
 }
-class CoreFinder implements IteratorAggregate {
+class ModelFinder implements IteratorAggregate {
   
   protected $objtype;
   protected $matcher = false;
@@ -596,8 +604,39 @@ class CoreFinder implements IteratorAggregate {
     return $items;
   }
   
-  protected function _buildSQL() {
-    throw new Exception("_buildSQL() has not been implemented!");
+  // Model _buildSQL
+  protected function _buildSQL($isCount=false) {
+    if($isCount)
+      $sql = "SELECT count(id) as count FROM ". $this->objtype ." ";
+    else
+      $sql = "SELECT * FROM ". $this->objtype ." ";
+    // TODO: Implment OR logic...
+    if(count($this->finder) > 0) {
+      $sql .= "WHERE ";
+      $finders = array();
+      foreach($this->finder as $qry) {
+        $finders []= $qry['col']." ".$qry['comp'].' "'. htmlentities($qry['val'],ENT_QUOTES).'"';
+      }
+      $sql .= join(" AND ", $finders);
+    }
+    if($isCount) return $sql.";";
+
+    if(count($this->order) > 0) {
+      $sql .= " ORDER BY ";
+      $order_params = array();
+      foreach ($this->order as $field => $dir) {
+        $order_params[]= $field." ".$dir;
+      }
+      $sql .= join(", ", $order_params);
+    }
+    if($this->limit != false && $this->limit > 0) {
+      $sql .= " LIMIT ". $this->limit ." ";
+    }
+    if($this->offset != false && $this->offset > 0) {
+      $sql .= " OFFSET ". $this->offset ." ";
+    }
+    $sql .= " ;";
+    return $sql;
   }
 }
 
@@ -642,16 +681,17 @@ class FinderMatch {
   }
 }
 
-//TODO: Consolidate Model and CoreModel
 //TODO: Figure out what to do for hasMany relationships onDestroy (for throughs, kill the joins. Otherwise?)
 
-class CoreModel {
+class Model {
 
     public $modelName = null;
     
     protected $data = false;
     protected $isNew = false;
     protected $isDirty = false;
+
+    protected $schema = array();
     protected $hasMany = array();
     protected $belongsTo = array();
     protected $changedFields = array();
@@ -675,7 +715,6 @@ class CoreModel {
     }
 
     function __set($key, $value) {
-      // TODO: Validate against schema to ensure fields exist?
       $value = stripslashes($value);
       if(@ $this->data[$key] != htmlentities($value, ENT_QUOTES)) {
         $this->data[$key] = $value;
@@ -685,7 +724,6 @@ class CoreModel {
     }
     
     function __call( $method, $args ) {
-      // TODO: Support relationships here...
       if(array_key_exists($method, $this->hasMany)) {
         return $this->_handleHasMany($method, $args);
       }
@@ -733,16 +771,16 @@ class CoreModel {
       else if(array_key_exists('model', $def)) {
         $mdlClass = $def['model'];
         $fk = strtolower($mdlClass)."_id";
-        return Model::Get($mdlClass, $this->$fk);
+        return Model::Get($mdlClass, $this->{$fk});
       } else {
         throw new Exception("A relationship has to be defined as a model or document");
       }
     }
     
     protected function _handleRelationshipBuilder($mode, $modelName, $args) {
+      //TODO: Type and schema checking...
       $fk = strtolower($this->modelName)."_id";
       if($mode == 'new') {
-        //TODO: Type and schema checking...
         $mdl = new $modelName();
         $mdl->{$fk} = $this->id;
         if(count($args) > 0 && is_array($args[0])) {
@@ -751,13 +789,11 @@ class CoreModel {
         return $mdl;
       }
       else if($mode == 'add') {
-        //TODO: Type and schema checking...
         list($mdl) = $args;
         $mdl->{$fk} = $this->id;
         $mdl->save();
       }
       else if($mode == 'set') {
-        //TODO: Type and schema checking...
         list($mdl) = $args;
         $this->{$fk} = $mdl->id;
       }
@@ -785,10 +821,57 @@ class CoreModel {
     public function hasChanged($key) {
       return in_array($key, $this->changedFields);
     }
+    
+    public function getChangedValues() {
+      $valid_atts = array_keys( $this->schema );
+      $cleanChangedFields = array();
+      $results = array();
+      foreach($this->changedFields as $fieldname) {
+        if(in_array($fieldname, $valid_atts)) {
+          // Stringifies everything, is this really ideal?
+          $results[$fieldname] = '"'.htmlentities($this->$fieldname, ENT_QUOTES).'"';
+          $cleanChangedFields[] = $fieldname;
+        }
+      }
+      $this->changedFields = $cleanChangedFields;
+      return $results;
+    }
 
-    // Override these two
-    public function save() {}
-    public function destroy(){}
+    public function save() {
+      $result = true;
+      if($this->isDirty) {
+        $this->beforeSave();
+        if($this->isNew) {
+          // Create
+          $this->beforeCreate();
+          $result = $this->_handleSqlInsert();
+          $this->afterCreate();
+        } else {
+          // Update
+          $result = $this->_handleSqlUpdate();
+        }
+        $this->changedFields = array();
+        $this->isDirty = false;
+        $this->isNew = false;
+        $this->afterSave();
+      }
+      return $result;
+    }
+    
+    public function destroy(){
+      $this->beforeDestroy();
+      $thisDel = $this->_handleSqlDelete();
+      $relDel = $this->_handleRelatedSqlDelete();
+      $this->afterDestroy();
+      return ($thisDel && $relDel);
+    }
+
+    // WARNING: This doesn't trigger the callbacks!
+    public function kill(){
+      $thisDel = $this->_handleSqlDelete();
+      $relDel = $this->_handleRelatedSqlDelete();
+      return ($thisDel && $relDel);
+    }
     
     // Callbacks
     protected function beforeSave() {}
@@ -797,26 +880,80 @@ class CoreModel {
     protected function afterCreate() {}
     protected function beforeDestroy() {}
     protected function afterDestroy() {}
-    protected function beforeSerialize() {}
-    protected function afterSerialize() {}
 
-    protected function getChangedValues() {
-      $results = array();
-      foreach($this->changedFields as $key=>$fieldname) {
-        $results[$fieldname] = $this->$fieldname;
+    // Override these in subclasses...
+    protected function _handleSqlCreate() {
+      $sql = "CREATE TABLE IF NOT EXISTS ";
+      $sql.= $this->modelName ." ( ";
+      $cols = array();
+      $modelColumns = $this->schema;
+      if(!array_key_exists('id',$this->schema))
+        $modelColumns["id"] = 'INTEGER PRIMARY KEY';
+      foreach($modelColumns as $name=>$def) {
+        $cols[] = $name ." ". $def;
       }
-      return $results;
+      $sql.= join($cols, ', ');
+      $sql.= " );";
+      $statement = DB::Query( $sql );
+      // Trigger to auto-insert created_on
+      if(array_key_exists('created_on', $this->schema)) {
+        $triggerSQL = "CREATE TRIGGER generate_". $this->modelName ."_created_on AFTER INSERT ON ". $this->modelName ." BEGIN UPDATE ". $this->modelName ." SET created_on = DATETIME('NOW') WHERE rowid = new.rowid; END;";
+        if(DB::Query( $triggerSQL ) == false) $statement = false;
+      }
+      // Trigger to auto-insert updated_on
+      if(array_key_exists('updated_on', $this->schema)) {
+        $triggerSQL = "CREATE TRIGGER generate_". $this->modelName ."_updated_on AFTER UPDATE ON ". $this->modelName ." BEGIN UPDATE ". $this->modelName ." SET updated_on = DATETIME('NOW') WHERE rowid = new.rowid; END;";
+        if(DB::Query( $triggerSQL ) == false) $statement = false;
+      }
+      return ($statement != false);
     }
     
-    protected function _handleSqlCreate() {
-    }
     protected function _handleSqlInsert() {
+      $values = $this->getChangedValues();
+      $sql = "INSERT INTO ".$this->modelName." (".join($this->changedFields, ', ').") VALUES (".join($values, ', ').");";
+      $statement = DB::Query($sql);
+      if($statement == false) return false;
+      // Get the record's generated ID...
+      $result = DB::Query('SELECT last_insert_rowid() as last_insert_rowid')->fetch();
+      $this->data['id'] = $result['last_insert_rowid'];
+      return true;
     }
+    
     protected function _handleSqlUpdate() {
+      $values = $this->getChangedValues();
+      $fields = array();
+      foreach($values as $field=>$value) {
+        $fields[] = $field." = ".$value;
+      }
+      $sql = "UPDATE ".$this->modelName." SET ". join($fields, ", ") ." WHERE id = ". $this->id .";";
+      $statement = DB::Query($sql);
+      return ($statement != false);
     }
+    
     protected function _handleSqlDelete() {
+      $sql = "DELETE FROM ".$this->modelName." WHERE id = ". $this->id .";";
+      $stmt = DB::Query($sql);
+      return ($stmt != false);
     }
+    
     protected function _handleRelatedSqlDelete() {
+      $fk = strtolower($this->modelName)."_id";
+      foreach ($this->hasMany as $methodName => $relDef) {
+        $rule = (array_key_exists('cascade', $relDef)) ? $relDef['cascade'] : 'delete';
+        if(array_key_exists('through', $relDef)) {
+          $joinerCls = $relDef['through'];
+          get($joinerCls)->where($fk)->eq($this->id)->destroy();
+        }
+        else {
+          $mdlCls = (array_key_exists('document', $relDef)) ? $relDef['document'] : $relDef['model'];
+          $matches = get($mdlCls)->where($fk)->eq($this->id);
+          if($rule == 'delete')
+            $matches->destroy();
+          else// if($rule == 'nullify') // Could also use 'cascade'=>'ignore'???
+            $matches->update(array($fk=>null)); // nullifies
+        }
+      }
+      return true;
     }
     
     public function to_array($exclude=array()) {
@@ -830,22 +967,52 @@ class CoreModel {
     }
     
     public function to_json($exclude=array()) {
-      return CoreModel::toJSON( $this->to_array($exclude) );
+      return Model::toJSON( $this->to_array($exclude) );
     }
-      
-    // = Static methods / variables =    
+    
+    public function createTableForModel() {
+      return $this->_handleSqlCreate();
+    }
+
+// Static Helper Methods...
+
+    public static $IsModel = true;
+    public static $IsDocument = false;
+
+    public static function Get($modelName, $id) {
+      $sql = "SELECT * FROM ".$modelName." WHERE id = ". $id ." LIMIT 1;";
+      $results = DB::FetchAll($sql);
+      return new $modelName( $results[0] );
+    }
+
+    public static function Find($modelName) {
+      return new ModelFinder($modelName);
+    }
+
+    // Does NOT fire callbacks...
+    public static function Remove($modelName, $id) {
+      $inst = self::Get($modelName, $id);
+      return $inst->kill();
+    }
+
+    static public function Count($className) {
+      $sql = "SELECT count(id) as count FROM ".$className.";";
+      $results = DB::FetchAll($sql);
+      return @(integer)$results[0]['count'];
+    }
+
     static public function toJSON($obj) {
       if(is_array($obj)) {
         $data = array();
         foreach($obj as $idx=>$mdl) {
-          if($mdl instanceof CoreModel)
+          if($mdl instanceof Model)
             $data[] = $mdl->to_array();
           else
             $data[$idx] = $mdl;
         }
         return json_encode($data);
         
-      } else if( $obj instanceof CoreModel ) {
+      } else if( $obj instanceof Model ) {
         return json_encode($obj->to_array());
       
       } else {
@@ -854,172 +1021,6 @@ class CoreModel {
     }
 }
 
-
-class Model extends CoreModel {
-  
-  protected $schema = array();
-  
-  // public function updateValues($values=array()) {
-  //   $valid_atts = array_keys( $this->schema );
-  //   foreach($values as $key=>$value) {
-  //     if(in_array($key, $valid_atts)) $this->$key = $value;
-  //   }
-  //   return $this;
-  // }
-  
-  protected function getChangedValues() {
-    $valid_atts = array_keys( $this->schema );
-    $cleanChangedFields = array();
-    $results = array();
-    foreach($this->changedFields as $fieldname) {
-      if(in_array($fieldname, $valid_atts)) {
-        $results[$fieldname] = '"'.htmlentities($this->$fieldname, ENT_QUOTES).'"';
-        $cleanChangedFields[] = $fieldname;
-      }
-    }
-    $this->changedFields = $cleanChangedFields;
-    return $results;
-  }
-  
-  public function save() {
-    if($this->isDirty) {
-      $this->beforeSave();
-      if($this->isNew) {
-        // Create
-        $this->beforeCreate();
-        $values = $this->getChangedValues();
-        $sql = "INSERT INTO ".$this->modelName." (".join($this->changedFields, ', ').") VALUES (".join($values, ', ').");";
-        $statement = DB::Query($sql);
-        if($statement == false) return false;
-        // Get the record's generated ID...
-        $result = DB::Query('SELECT last_insert_rowid() as last_insert_rowid')->fetch();
-        $this->data['id'] = $result['last_insert_rowid'];
-        $this->afterCreate();
-      } else {
-        // Update
-        $values = $this->getChangedValues();
-        $fields = array();
-        foreach($values as $field=>$value) {
-          $fields[] = $field." = ".$value;
-        }
-        $sql = "UPDATE ".$this->modelName." SET ". join($fields, ", ") ." WHERE id = ". $this->id .";";
-        $statement = DB::Query($sql);
-        if($statement == false) return false;
-      }
-      $this->changedFields = array();
-      $this->isDirty = false;
-      $this->isNew = false;
-      $this->afterSave();
-    }
-    return true;
-  }
-  
-  // Warning: Like Han solo, this method doesn't fuck around, it will shoot first.
-  public function destroy() {
-    $this->beforeDestroy();
-    Model::Remove($this->modelName, $this->id);
-    $this->afterDestroy();
-    return $this;
-  }
-  
-  // = SQL Builder Helper Methods =
-  
-  public function _createTableForModel() {
-    return self::CreateTableForModel($this->modelName, $this);
-  }
-  
-  
-   static public function CreateTableForModel($modelName, $mdlInst=false) {
-     $sql = "CREATE TABLE IF NOT EXISTS ";
-     $sql.= $modelName ." ( ";
-     $cols = array();
-     if(! $mdlInst) $mdlInst = new $modelName;
-
-     $modelColumns = $mdlInst->schema;
-     $modelColumns["id"] = 'INTEGER PRIMARY KEY';
-     
-     foreach($modelColumns as $name=>$def) {
-       $cols[] = $name ." ". $def;
-     }
-     $sql.= join($cols, ', ');
-     $sql.= " );";
-     
-     //FIXME: If create_on or updated_on are in schema, create triggers to auto-update them.
-
-     return DB::Query( $sql );
-   }
-
-   public static function Get($modelName, $id) {
-     $sql = "SELECT * FROM ".$modelName." WHERE id = ". $id ." LIMIT 1;";
-     $results = DB::FetchAll($sql);
-     $mdls = array();
-     foreach ($results as $row) {
-       $mdls[] = new $modelName($row);
-     }
-     return @$mdls[0];
-   }
-   
-   public static function Find($modelName) {
-     return new ModelFinder($modelName);
-   }
-
-   // Does NOT fire callbacks...
-   public static function Remove($modelName, $id) {
-     $sql = "DELETE FROM ".$modelName." WHERE id = ". $id .";";
-     DB::Query($sql);
-   }
-
-   static public function Count($className) {
-     $sql = "SELECT count(id) as count FROM ".$className.";";
-     $statement = DB::Query($sql);
-     if($statement) {
-       $results = $statement->fetchAll(); // PDO::FETCH_ASSOC ???
-       return @(integer)$results[0]['count'];
-     } else { // Throw an ERROR?
-       return 0;
-     }
-   }
-}
-
-
-class ModelFinder extends CoreFinder {
-
-  // Model _buildSQL
-  protected function _buildSQL($isCount=false) {
-    if($isCount)
-      $sql = "SELECT count(id) as count FROM ". $this->objtype ." ";
-    else
-      $sql = "SELECT * FROM ". $this->objtype ." ";
-    // TODO: Implment OR logic...
-    if(count($this->finder) > 0) {
-      $sql .= "WHERE ";
-      $finders = array();
-      foreach($this->finder as $qry) {
-        $finders []= $qry['col']." ".$qry['comp'].' "'. htmlentities($qry['val'],ENT_QUOTES).'"';
-      }
-      $sql .= join(" AND ", $finders);
-    }
-    if($isCount) return $sql.";";
-
-    if(count($this->order) > 0) {
-      $sql .= " ORDER BY ";
-      $order_params = array();
-      foreach ($this->order as $field => $dir) {
-        $order_params[]= $field." ".$dir;
-      }
-      $sql .= join(", ", $order_params);
-    }
-    if($this->limit != false && $this->limit > 0) {
-      $sql .= " LIMIT ". $this->limit ." ";
-    }
-    if($this->offset != false && $this->offset > 0) {
-      $sql .= " OFFSET ". $this->offset ." ";
-    }
-    $sql .= " ;";
-    return $sql;
-  }
-
-}
 
 class Joiner extends Model {
   
@@ -1064,7 +1065,7 @@ class Joiner extends Model {
     
 }
  
-class Document extends CoreModel {
+class Document extends Model {
 
   public $id = null;
   public $created_on = null;
@@ -1072,6 +1073,14 @@ class Document extends CoreModel {
   
   protected $rawData = null;
   protected $indexes = array();
+  
+  // It's best if you don't override this...
+  protected $schema = array(
+    'id'          => 'INTEGER PRIMARY KEY',
+    'data'        => 'TEXT',
+    'created_on'  => 'DATETIME',
+    'updated_on'  => 'DATETIME'
+  );
 
   function __construct($dataRow=null) {
     parent::__construct($dataRow);
@@ -1086,6 +1095,7 @@ class Document extends CoreModel {
       $this->data = array();
       $this->id = null;
     }
+    // Force the $schema ??? To prevent overrides?
   }
 
   function __get($key) {
@@ -1107,55 +1117,70 @@ class Document extends CoreModel {
     if(!$this->data) $this->_deserialize();
     return array_key_exists($key, $this->data);
   }
-
-  public function save() {
-    if($this->isDirty) {
-      $this->beforeSave();
-      if($this->isNew) { // Insert
-        $this->beforeCreate();
-        $this->_serialize();
-        $sql = 'INSERT INTO '.$this->modelName.' ( data ) VALUES ( "'. $this->rawData .'" );';
-        $this->created_on = $this->updated_on = gmdate('Y-m-d H:i:s'); // Not official
-        $statement = DB::Query($sql);
-        if($statement == false) return false;
-        $result = DB::Query('SELECT last_insert_rowid() as last_insert_rowid')->fetch(); // Get the record's generated ID...
-        $this->id = $result['last_insert_rowid'];
-        Document::Reindex($this->modelName, $this->id);
-        $this->afterCreate();
-      } else { // Update
-        $this->_serialize();
-        $sql = "UPDATE ".$this->modelName.' SET data="'. $this->rawData .'" WHERE id = '. $this->id .';';
-        $statement = DB::Query($sql);
-        if($statement == false) return false;
-        $this->updated_on = gmdate('Y-m-d H:i:s'); // Not official
-        $index_changed = array_intersect($this->changedFields, array_keys(Document::GetIndexesFor($this->modelName)));
-        if(count($index_changed) > 0) { // Only if an indexed field has changed {
-          // debug("Reindexing because these fields changed:");
-          // debug($index_changed);
-          Document::Reindex($this->modelName, $this->id);
-        }
-      }
-      $this->changedFields = array();
-      $this->isDirty = false;
-      $this->isNew = false;
-      $this->afterSave();
+  
+  public function getChangedValues() {
+    $results = array();
+    foreach($this->changedFields as $key=>$fieldname) {
+      $results[$fieldname] = $this->$fieldname;
+    }
+    return $results;
+  }
+  
+  public function reindex() {
+    $wasSuccessful = true;
+    foreach ($this->indexes as $field=>$fType) { // TODO: Optimize as single transactions?
+      $indexTable = $this->modelName ."_". $field ."_idx";
+      $sql = "DELETE FROM ". $indexTable ." WHERE docid = ". $this->id .";";
+      if(DB::Query($sql) == false) $wasSuccessful = false;
+      $sql = "INSERT INTO ". $indexTable ." ( docid, ". $field ." ) VALUES (".$this->id.', "'.htmlentities($this->{$field}, ENT_QUOTES).'" );';
+      if(DB::Query($sql) == false) $wasSuccessful = false;
+    }
+    return $wasSuccessful;
+  }
+  
+  protected function _handleSqlCreate() {
+    $mdlRes = parent::_handleSqlCreate();
+    // Create index tables...
+    $idxRes = true;
+    foreach ($this->indexes as $field=>$fType) {
+      $indexSQL = "CREATE TABLE IF NOT EXISTS ". $this->modelName ."_". $field ."_idx ( id INTEGER PRIMARY KEY, docid INTEGER, ". $field ." ". $fType ." );";
+      if(DB::Query( $indexSQL ) == false) $idxRes = false;
+    }
+    return ($mdlRes != false && $idxRes != false);
+  }
+   
+  protected function _handleSqlInsert() {
+    $this->_serialize();
+    $sql = 'INSERT INTO '.$this->modelName.' ( data ) VALUES ( "'. $this->rawData .'" );';
+    $this->created_on = $this->updated_on = gmdate('Y-m-d H:i:s'); // Not official
+    $statement = DB::Query($sql);
+    if($statement == false) return false;
+    $result = DB::Query('SELECT last_insert_rowid() as last_insert_rowid')->fetch(); // Get the record's generated ID...
+    $this->id = $result['last_insert_rowid'];
+    $this->reindex();
+    return true;
+  }
+   
+  protected function _handleSqlUpdate() {
+    $this->_serialize();
+    $sql = "UPDATE ".$this->modelName.' SET data="'. $this->rawData .'" WHERE id = '. $this->id .';';
+    $statement = DB::Query($sql);
+    if($statement == false) return false;
+    $this->updated_on = gmdate('Y-m-d H:i:s'); // Not official
+    $index_changed = array_intersect($this->changedFields, array_keys($this->indexes));
+    if(count($index_changed) > 0) { // Only if an indexed field has changed
+      $this->reindex();
     }
     return true;
   }
-
-  // TODO: Add some sort of RELOAD method...
-
-  // Warning: Like Han solo, this method doesn't fuck around, it will shoot first.
-  public function destroy() {
-    $this->beforeDestroy();
-    Document::Remove($this->modelName, $this->id);
-    $this->afterDestroy();
-    return $this;
-  }
-  
-  public function _defineDocumentFromModel() {
-    // TODO: If this->belongsTo, then auto create the needed index(es)?
-    Document::Define( $this->modelName, $this->indexes, false);
+   
+  protected function _handleRelatedSqlDelete() {
+    $removedIndexes = true;
+    foreach ( $this->indexes as $field=>$fType) {
+      $sql = "DELETE FROM ".$this->modelName."_".$field."_idx WHERE docid = ". $this->id .";";
+      if(DB::Query($sql) == false) $removedIndexes = false;
+    }
+    return (parent::_handleRelatedSqlDelete() && $removedIndexes);
   }
   
   protected function beforeDeserialize() {}
@@ -1184,7 +1209,11 @@ class Document extends CoreModel {
   }
   
   public function to_array($exclude=array()) {
-    $attrs = array( 'id'=>$this->id );
+    $attrs = array(
+      'id'=>$this->id,
+      'created_on'=>$this->created_on,
+      'updated_on'=>$this->updated_on,
+    );
     foreach($this->data as $col=>$value) {
       if(!in_array($col, $exclude)) {
         $attrs[$col] = $this->$col;
@@ -1195,137 +1224,32 @@ class Document extends CoreModel {
   
   // Static Methods
   
-  private static $_document_indexes_ = array();
-  
-  // Think this goes away
-  // public static function Register($class) {
-  //   $doc = new $class();
-  //   $doc->_defineDocumentFromModel();
-  // }
-  
-  public static function Define($name, $indexes=array(), $createClass=true) {
-    Document::$_document_indexes_[$name] = array_merge($indexes, array()); // a hokey way to clone an array
-    if($createClass)
-      eval("class ". $name ." extends Document {  }");
+  public static $IsModel = false;
+  public static $IsDocument = true;
+
+  public static function ReindexAll($doctype) {
+    doc($doctype)->reindex();
   }
   
-  // FIXME: Clean this up so that it runs in a single transaction/sql call???
-  // TODO: Call ShortStack::LoadAllModels??? 
-  public static function InitializeDatabase() {
-    // Loop through all the docs and create tables and index tables...
-    foreach( Document::$_document_indexes_ as $docType => $indexes) {
-      $tableSQL = "CREATE TABLE IF NOT EXISTS ". $docType ." ( id INTEGER PRIMARY KEY, data TEXT, created_on DATETIME, updated_on DATETIME );";
-      DB::Query( $tableSQL );
-      // Trigger to auto-insert created_on
-      $triggerSQL = "CREATE TRIGGER generate_". $docType ."_created_on AFTER INSERT ON ". $docType ." BEGIN UPDATE ". $docType ." SET created_on = DATETIME('NOW') WHERE rowid = new.rowid; END;";
-      DB::Query( $triggerSQL );
-      // Trigger to auto-insert updated_on
-      $triggerSQL = "CREATE TRIGGER generate_". $docType ."_updated_on AFTER UPDATE ON ". $docType ." BEGIN UPDATE ". $docType ." SET updated_on = DATETIME('NOW') WHERE rowid = new.rowid; END;";
-      DB::Query( $triggerSQL );
-      // Create index tables
-      foreach ($indexes as $field=>$fType) {
-        $indexSQL = "CREATE TABLE IF NOT EXISTS ". $docType ."_". $field ."_idx ( id INTEGER PRIMARY KEY, docid INTEGER, ". $field ." ". $fType ." );";
-        DB::Query( $indexSQL );
-      }
-    }
-  }
-  
-  public static function Reindex($doctype=null, $id=null) {
-    // Loop through all the records, deserialize the data column and recreate the index rows
-    $docs = array();
-    // Step one: Fetch all the documents to update...
-    if($doctype != null) {
-      // if(!array_key_exists($doctype, Document::$_document_indexes_)) { // don't think this matters anymore
-      //   $tmp = new $doctype();
-      //   $tmp->_defineDocumentFromModel();
-      // }
-      if($id != null) {
-        $sql = "SELECT * FROM ".$doctype." WHERE id = ". $id .";";
-      } else {
-        $sql = "SELECT * FROM ".$doctype.";";
-      }
-      $results = DB::FetchAll($sql);
-      foreach ($results as $row) {
-        $docs[] = new $doctype($row);
-      }
-    } else {
-      // Do 'em all!
-      foreach( Document::$_document_indexes_ as $docType => $indexes) {
-        $sql = "SELECT * FROM ".$doctype.";";
-        $results = DB::FetchAll($sql);
-        foreach ($results as $row) {
-          $docs[] = new $doctype($row);
-        }
-      }
-    }
-    // Step two: Loop through them and delete, then rebuild index rows
-    foreach ($docs as $doc) {
-      $indexes = Document::GetIndexesFor($doc->modelName);
-      if(count($indexes) > 0) {
-        foreach ($indexes as $field=>$fType) {
-          // TODO: Optimize as single transactions?
-          $indexTable = $doc->modelName ."_". $field ."_idx";
-          $sql = "DELETE FROM ". $indexTable ." WHERE docid = ". $doc->id .";";
-          $results = DB::Query($sql);
-          $sql = "INSERT INTO ". $indexTable ." ( docid, ". $field ." ) VALUES (".$doc->id.', "'.htmlentities($doc->{$field}, ENT_QUOTES).'" );';
-          $results = DB::Query($sql);
-        }
-      }
-    }
-  }
-  
-  public static function Get($doctype, $id) {
-    $sql = "SELECT * FROM ".$doctype." WHERE id = ". $id ." LIMIT 1;";
-    $results = DB::FetchAll($sql);
-    $docs = array();
-    foreach ($results as $row) {
-      $docs[] = new $doctype($row);
-    }
-    return @$docs[0];
-  }
- 
   public static function Find($doctype) {
     return new DocumentFinder($doctype);
-  }
-  
-  // Doesn't fire callbacks!
-  public static function Remove($doctype, $id) {
-    $sql = "DELETE FROM ".$doctype." WHERE id = ". $id .";";
-    DB::Query($sql);
-    foreach ( Document::GetIndexesFor($doctype) as $field=>$fType) {
-      $sql = "DELETE FROM ".$doctype."_".$field."_idx WHERE docid = ". $id .";";
-      DB::Query($sql);
-    }
-  }
-  
-  public static function Count($doctype) {
-    $sql = "SELECT count(id) as count FROM ".$doctype.";";
-    $statement = DB::Query($sql);
-    if($statement) {
-      $results = $statement->fetchAll(); // PDO::FETCH_ASSOC ???
-      return @(integer)$results[0]['count'];
-    } else { // Throw an ERROR?
-      return 0;
-    }
-  }
-
-  public static function GetIndexesFor($doctype) {
-    if(!array_key_exists($doctype, Document::$_document_indexes_)) {
-      $doc = new $doctype();
-      $doc->_defineDocumentFromModel();
-    }
-    return Document::$_document_indexes_[$doctype];
   }
   
 }
 
 
-class DocumentFinder extends CoreFinder {
+class DocumentFinder extends ModelFinder {
   private $nativeFields = array('id','created_on','updated_on');
+  
+  public function reindex() {
+    foreach ($this as $doc) {
+      $doc->reindex();
+    }
+  }
   
   // FIXME: All these loops really need an optimization pass...
   protected function _buildSQL($isCount=false) {
-    // TODO: Implment OR logic...
+    // TODO: Implement OR logic...
     $all_order_cols = array();
     $native_order_cols = array();
     foreach($this->order as $field=>$other) {
@@ -1429,7 +1353,7 @@ class Pager implements IteratorAggregate {
   public $pages = 0;
   
   function __construct($finder, $pageSize=10, $params=array()) {
-    if($finder instanceof CoreFinder) {
+    if($finder instanceof ModelFinder) {
       $this->finder = $finder;
     } else if(is_string($finder)) {
       $this->finder = get($finder);
