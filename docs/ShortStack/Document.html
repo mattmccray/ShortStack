@@ -1,0 +1,687 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+  <html xmlns="http://www.w3.org/1999/xhtml">
+		<head>
+			<!-- template designed by Marco Von Ballmoos -->
+			<title>Docs For Class Document</title>
+			<link rel="stylesheet" href="../media/stylesheet.css" />
+			<meta http-equiv='Content-Type' content='text/html; charset=iso-8859-1'/>
+		</head>
+		<body>
+			<div class="page-body">			
+<h2 class="class-name">Class Document</h2>
+
+<a name="sec-description"></a>
+<div class="info-box">
+	<div class="info-box-title">Description</div>
+	<div class="nav-bar">
+					<span class="disabled">Description</span> |
+													<a href="#sec-var-summary">Vars</a> (<a href="#sec-vars">details</a>)
+						|											<a href="#sec-method-summary">Methods</a> (<a href="#sec-methods">details</a>)
+						
+					</div>
+	<div class="info-box-body">
+        		<!-- ========== Info from phpDoc block ========= -->
+<p class="short-description">Base class for all Database Models (ORM).</p>
+		<p class="notes">
+			Located in <a class="field" href="_document.php.html">/document.php</a> (line <span class="field">3</span>)
+		</p>
+		
+				
+		<pre><a href="../ShortStack/Model.html">Model</a>
+   |
+   --Document</pre>
+	
+			</div>
+</div>
+
+
+
+	<a name="sec-var-summary"></a>
+	<div class="info-box">
+		<div class="info-box-title">Variable Summary</span></div>
+		<div class="nav-bar">
+			<a href="#sec-description">Description</a> |
+						<span class="disabled">Vars</span> (<a href="#sec-vars">details</a>)
+							| 
+									<a href="#sec-method-summary">Methods</a> (<a href="#sec-methods">details</a>)
+							
+								</div>
+		<div class="info-box-body">
+			<div class="var-summary">
+																																				<div class="var-title">
+					static <span class="var-type">mixed</span>
+					<a href="#$IsDocument" title="details" class="var-name">$IsDocument</a>
+				</div>
+																<div class="var-title">
+					static <span class="var-type">mixed</span>
+					<a href="#$IsModel" title="details" class="var-name">$IsModel</a>
+				</div>
+																												<div class="var-title">
+					<span class="var-type">mixed</span>
+					<a href="#$created_on" title="details" class="var-name">$created_on</a>
+				</div>
+																<div class="var-title">
+					<span class="var-type">mixed</span>
+					<a href="#$id" title="details" class="var-name">$id</a>
+				</div>
+																<div class="var-title">
+					<span class="var-type">mixed</span>
+					<a href="#$indexes" title="details" class="var-name">$indexes</a>
+				</div>
+																																<div class="var-title">
+					<span class="var-type">mixed</span>
+					<a href="#$updated_on" title="details" class="var-name">$updated_on</a>
+				</div>
+											</div>
+		</div>
+	</div>
+
+	<a name="sec-method-summary"></a>
+	<div class="info-box">
+		<div class="info-box-title">Method Summary</span></div>
+		<div class="nav-bar">
+			<a href="#sec-description">Description</a> |
+																		<a href="#sec-var-summary">Vars</a> (<a href="#sec-vars">details</a>)
+				 
+				|
+						<span class="disabled">Methods</span> (<a href="#sec-methods">details</a>)
+		</div>
+		<div class="info-box-body">			
+			<div class="method-summary">
+																																												<div class="method-definition">
+					static 						<span class="method-result">void</span>
+										<a href="#Find" title="details" class="method-name">Find</a>
+											(<span class="var-type"></span>&nbsp;<span class="var-name">$doctype</span>)
+									</div>
+																																								<div class="method-definition">
+					static 						<span class="method-result">void</span>
+										<a href="#ReindexAll" title="details" class="method-name">ReindexAll</a>
+											(<span class="var-type"></span>&nbsp;<span class="var-name">$doctype</span>)
+									</div>
+																								
+												<div class="method-definition">
+											<span class="method-result">Document</span>
+										<a href="#__construct" title="details" class="method-name">__construct</a>
+											([<span class="var-type"></span>&nbsp;<span class="var-name">$dataRow</span> = <span class="var-default">null</span>])
+									</div>
+																<div class="method-definition">
+											<span class="method-result">void</span>
+										<a href="#afterDeserialize" title="details" class="method-name">afterDeserialize</a>
+										()
+									</div>
+																<div class="method-definition">
+											<span class="method-result">void</span>
+										<a href="#beforeDeserialize" title="details" class="method-name">beforeDeserialize</a>
+										()
+									</div>
+																<div class="method-definition">
+											<span class="method-result">void</span>
+										<a href="#deserialize" title="details" class="method-name">deserialize</a>
+											(<span class="var-type"></span>&nbsp;<span class="var-name">$source</span>)
+									</div>
+																								<div class="method-definition">
+											<span class="method-result">void</span>
+										<a href="#getChangedValues" title="details" class="method-name">getChangedValues</a>
+										()
+									</div>
+																<div class="method-definition">
+											<span class="method-result">void</span>
+										<a href="#has" title="details" class="method-name">has</a>
+											(<span class="var-type"></span>&nbsp;<span class="var-name">$key</span>)
+									</div>
+																<div class="method-definition">
+											<span class="method-result">void</span>
+										<a href="#reindex" title="details" class="method-name">reindex</a>
+										()
+									</div>
+																								<div class="method-definition">
+											<span class="method-result">void</span>
+										<a href="#serialize" title="details" class="method-name">serialize</a>
+											(<span class="var-type"></span>&nbsp;<span class="var-name">$source</span>)
+									</div>
+																<div class="method-definition">
+											<span class="method-result">void</span>
+										<a href="#to_array" title="details" class="method-name">to_array</a>
+											([<span class="var-type"></span>&nbsp;<span class="var-name">$exclude</span> = <span class="var-default">array()</span>])
+									</div>
+								</div>
+		</div>
+	</div>		
+
+	<a name="sec-vars"></a>
+	<div class="info-box">
+		<div class="info-box-title">Variables</div>
+		<div class="nav-bar">
+			<a href="#sec-description">Description</a> |
+										<a href="#sec-var-summary">Vars</a> (<span class="disabled">details</span>)
+						
+			
+										| 
+									<a href="#sec-method-summary">Methods</a> (<a href="#sec-methods">details</a>)
+							
+					</div>
+		<div class="info-box-body">
+			<a name="var$IsDocument" id="$IsDocument"><!-- --></A>
+<div class="evenrow">
+
+	<div class="var-header">
+		<span class="var-title">
+			static <span class="var-type">mixed</span>
+			<span class="var-name">$IsDocument</span>
+			 = <span class="var-default"> true</span>			(line <span class="line-number">167</span>)
+		</span>
+	</div>
+
+	<!-- ========== Info from phpDoc block ========= -->
+	<ul class="tags">
+				<li><span class="field">access:</span> public</li>
+			</ul>
+	
+	
+			<hr class="separator" />
+		<div class="notes">Redefinition of:</div>
+		<dl>
+			<dt><a href="../ShortStack/Model.html#var$IsDocument">Model::$IsDocument</a></dt>
+					</dl>
+		
+		
+
+</div>
+<a name="var$IsModel" id="$IsModel"><!-- --></A>
+<div class="oddrow">
+
+	<div class="var-header">
+		<span class="var-title">
+			static <span class="var-type">mixed</span>
+			<span class="var-name">$IsModel</span>
+			 = <span class="var-default"> false</span>			(line <span class="line-number">166</span>)
+		</span>
+	</div>
+
+	<!-- ========== Info from phpDoc block ========= -->
+	<ul class="tags">
+				<li><span class="field">access:</span> public</li>
+			</ul>
+	
+	
+			<hr class="separator" />
+		<div class="notes">Redefinition of:</div>
+		<dl>
+			<dt><a href="../ShortStack/Model.html#var$IsModel">Model::$IsModel</a></dt>
+					</dl>
+		
+		
+
+</div>
+<a name="var$created_on" id="$created_on"><!-- --></A>
+<div class="evenrow">
+
+	<div class="var-header">
+		<span class="var-title">
+			<span class="var-type">mixed</span>
+			<span class="var-name">$created_on</span>
+			 = <span class="var-default"> null</span>			(line <span class="line-number">5</span>)
+		</span>
+	</div>
+
+	<!-- ========== Info from phpDoc block ========= -->
+	<ul class="tags">
+				<li><span class="field">access:</span> public</li>
+			</ul>
+	
+	
+		
+		
+
+</div>
+<a name="var$id" id="$id"><!-- --></A>
+<div class="oddrow">
+
+	<div class="var-header">
+		<span class="var-title">
+			<span class="var-type">mixed</span>
+			<span class="var-name">$id</span>
+			 = <span class="var-default"> null</span>			(line <span class="line-number">4</span>)
+		</span>
+	</div>
+
+	<!-- ========== Info from phpDoc block ========= -->
+	<ul class="tags">
+				<li><span class="field">access:</span> public</li>
+			</ul>
+	
+	
+		
+		
+
+</div>
+<a name="var$indexes" id="$indexes"><!-- --></A>
+<div class="evenrow">
+
+	<div class="var-header">
+		<span class="var-title">
+			<span class="var-type">mixed</span>
+			<span class="var-name">$indexes</span>
+			 = <span class="var-default">array()</span>			(line <span class="line-number">7</span>)
+		</span>
+	</div>
+
+	<!-- ========== Info from phpDoc block ========= -->
+	<ul class="tags">
+				<li><span class="field">access:</span> protected</li>
+			</ul>
+	
+	
+		
+		
+
+</div>
+<a name="var$updated_on" id="$updated_on"><!-- --></A>
+<div class="oddrow">
+
+	<div class="var-header">
+		<span class="var-title">
+			<span class="var-type">mixed</span>
+			<span class="var-name">$updated_on</span>
+			 = <span class="var-default"> null</span>			(line <span class="line-number">6</span>)
+		</span>
+	</div>
+
+	<!-- ========== Info from phpDoc block ========= -->
+	<ul class="tags">
+				<li><span class="field">access:</span> public</li>
+			</ul>
+	
+	
+		
+		
+
+</div>
+							<h4>Inherited Variables</h4>
+				<A NAME='inherited_vars'><!-- --></A>
+									<p>Inherited from <span class="classname"><a href="../ShortStack/Model.html">Model</a></span></p>
+					<blockquote>
+													<span class="var-title">
+								<span class="var-name"><a href="../ShortStack/Model.html#var$belongsTo">Model::$belongsTo</a></span><br>
+							</span>
+													<span class="var-title">
+								<span class="var-name"><a href="../ShortStack/Model.html#var$changedFields">Model::$changedFields</a></span><br>
+							</span>
+													<span class="var-title">
+								<span class="var-name"><a href="../ShortStack/Model.html#var$hasMany">Model::$hasMany</a></span><br>
+							</span>
+													<span class="var-title">
+								<span class="var-name"><a href="../ShortStack/Model.html#var$modelName">Model::$modelName</a></span><br>
+							</span>
+													<span class="var-title">
+								<span class="var-name"><a href="../ShortStack/Model.html#var$schema">Model::$schema</a></span><br>
+							</span>
+											</blockquote> 
+										
+		</div>
+	</div>
+	
+	<a name="sec-methods"></a>
+	<div class="info-box">
+		<div class="info-box-title">Methods</div>
+		<div class="nav-bar">
+			<a href="#sec-description">Description</a> |
+															<a href="#sec-var-summary">Vars</a> (<a href="#sec-vars">details</a>)
+																	<a href="#sec-method-summary">Methods</a> (<span class="disabled">details</span>)
+						
+		</div>
+		<div class="info-box-body">
+			<A NAME='method_detail'></A>
+<a name="methodFind" id="Find"><!-- --></a>
+<div class="evenrow">
+	
+	<div class="method-header">
+		<span class="method-title">static method Find</span> (line <span class="line-number">173</span>)
+	</div> 
+	
+	<!-- ========== Info from phpDoc block ========= -->
+	<ul class="tags">
+				<li><span class="field">access:</span> public</li>
+			</ul>
+	
+	<div class="method-signature">
+	    static
+		<span class="method-result">void</span>
+		<span class="method-name">
+			Find
+		</span>
+					(<span class="var-type"></span>&nbsp;<span class="var-name">$doctype</span>)
+			</div>
+	
+			<ul class="parameters">
+					<li>
+				<span class="var-type"></span>
+				<span class="var-name">$doctype</span>			</li>
+				</ul>
+		
+			<hr class="separator" />
+		<div class="notes">Redefinition of:</div>
+		<dl>
+			<dt><a href="../ShortStack/Model.html#methodFind">Model::Find()</a></dt>
+					</dl>
+			
+	</div>
+<a name="methodReindexAll" id="ReindexAll"><!-- --></a>
+<div class="oddrow">
+	
+	<div class="method-header">
+		<span class="method-title">static method ReindexAll</span> (line <span class="line-number">169</span>)
+	</div> 
+	
+	<!-- ========== Info from phpDoc block ========= -->
+	<ul class="tags">
+				<li><span class="field">access:</span> public</li>
+			</ul>
+	
+	<div class="method-signature">
+	    static
+		<span class="method-result">void</span>
+		<span class="method-name">
+			ReindexAll
+		</span>
+					(<span class="var-type"></span>&nbsp;<span class="var-name">$doctype</span>)
+			</div>
+	
+			<ul class="parameters">
+					<li>
+				<span class="var-type"></span>
+				<span class="var-name">$doctype</span>			</li>
+				</ul>
+		
+			
+	</div>
+
+<a name="method__construct" id="__construct"><!-- --></a>
+<div class="evenrow">
+	
+	<div class="method-header">
+		<span class="method-title">Constructor __construct</span> (line <span class="line-number">22</span>)
+	</div> 
+	
+	<!-- ========== Info from phpDoc block ========= -->
+	
+	<div class="method-signature">
+		<span class="method-result">Document</span>
+		<span class="method-name">
+			__construct
+		</span>
+					([<span class="var-type"></span>&nbsp;<span class="var-name">$dataRow</span> = <span class="var-default">null</span>])
+			</div>
+	
+			<ul class="parameters">
+					<li>
+				<span class="var-type"></span>
+				<span class="var-name">$dataRow</span>			</li>
+				</ul>
+		
+			<hr class="separator" />
+		<div class="notes">Redefinition of:</div>
+		<dl>
+			<dt><a href="../ShortStack/Model.html#method__construct">Model::__construct()</a></dt>
+					</dl>
+			
+	</div>
+<a name="methodafterDeserialize" id="afterDeserialize"><!-- --></a>
+<div class="oddrow">
+	
+	<div class="method-header">
+		<span class="method-title">afterDeserialize</span> (line <span class="line-number">156</span>)
+	</div> 
+	
+	<!-- ========== Info from phpDoc block ========= -->
+	<ul class="tags">
+				<li><span class="field">access:</span> protected</li>
+			</ul>
+	
+	<div class="method-signature">
+		<span class="method-result">void</span>
+		<span class="method-name">
+			afterDeserialize
+		</span>
+				()
+			</div>
+	
+		
+			
+	</div>
+<a name="methodbeforeDeserialize" id="beforeDeserialize"><!-- --></a>
+<div class="evenrow">
+	
+	<div class="method-header">
+		<span class="method-title">beforeDeserialize</span> (line <span class="line-number">155</span>)
+	</div> 
+	
+	<!-- ========== Info from phpDoc block ========= -->
+	<ul class="tags">
+				<li><span class="field">access:</span> protected</li>
+			</ul>
+	
+	<div class="method-signature">
+		<span class="method-result">void</span>
+		<span class="method-name">
+			beforeDeserialize
+		</span>
+				()
+			</div>
+	
+		
+			
+	</div>
+<a name="methoddeserialize" id="deserialize"><!-- --></a>
+<div class="oddrow">
+	
+	<div class="method-header">
+		<span class="method-title">deserialize</span> (line <span class="line-number">159</span>)
+	</div> 
+	
+	<!-- ========== Info from phpDoc block ========= -->
+	<ul class="tags">
+				<li><span class="field">access:</span> protected</li>
+			</ul>
+	
+	<div class="method-signature">
+		<span class="method-result">void</span>
+		<span class="method-name">
+			deserialize
+		</span>
+					(<span class="var-type"></span>&nbsp;<span class="var-name">$source</span>)
+			</div>
+	
+			<ul class="parameters">
+					<li>
+				<span class="var-type"></span>
+				<span class="var-name">$source</span>			</li>
+				</ul>
+		
+			
+	</div>
+<a name="methodgetChangedValues" id="getChangedValues"><!-- --></a>
+<div class="evenrow">
+	
+	<div class="method-header">
+		<span class="method-title">getChangedValues</span> (line <span class="line-number">43</span>)
+	</div> 
+	
+	<!-- ========== Info from phpDoc block ========= -->
+	<ul class="tags">
+				<li><span class="field">access:</span> public</li>
+			</ul>
+	
+	<div class="method-signature">
+		<span class="method-result">void</span>
+		<span class="method-name">
+			getChangedValues
+		</span>
+				()
+			</div>
+	
+		
+			<hr class="separator" />
+		<div class="notes">Redefinition of:</div>
+		<dl>
+			<dt><a href="../ShortStack/Model.html#methodgetChangedValues">Model::getChangedValues()</a></dt>
+					</dl>
+			
+	</div>
+<a name="methodhas" id="has"><!-- --></a>
+<div class="oddrow">
+	
+	<div class="method-header">
+		<span class="method-title">has</span> (line <span class="line-number">38</span>)
+	</div> 
+	
+	<!-- ========== Info from phpDoc block ========= -->
+	<ul class="tags">
+				<li><span class="field">access:</span> public</li>
+			</ul>
+	
+	<div class="method-signature">
+		<span class="method-result">void</span>
+		<span class="method-name">
+			has
+		</span>
+					(<span class="var-type"></span>&nbsp;<span class="var-name">$key</span>)
+			</div>
+	
+			<ul class="parameters">
+					<li>
+				<span class="var-type"></span>
+				<span class="var-name">$key</span>			</li>
+				</ul>
+		
+			<hr class="separator" />
+		<div class="notes">Redefinition of:</div>
+		<dl>
+			<dt><a href="../ShortStack/Model.html#methodhas">Model::has()</a></dt>
+					</dl>
+			
+	</div>
+<a name="methodreindex" id="reindex"><!-- --></a>
+<div class="evenrow">
+	
+	<div class="method-header">
+		<span class="method-title">reindex</span> (line <span class="line-number">51</span>)
+	</div> 
+	
+	<!-- ========== Info from phpDoc block ========= -->
+	<ul class="tags">
+				<li><span class="field">access:</span> public</li>
+			</ul>
+	
+	<div class="method-signature">
+		<span class="method-result">void</span>
+		<span class="method-name">
+			reindex
+		</span>
+				()
+			</div>
+	
+		
+			
+	</div>
+<a name="methodserialize" id="serialize"><!-- --></a>
+<div class="oddrow">
+	
+	<div class="method-header">
+		<span class="method-title">serialize</span> (line <span class="line-number">162</span>)
+	</div> 
+	
+	<!-- ========== Info from phpDoc block ========= -->
+	<ul class="tags">
+				<li><span class="field">access:</span> protected</li>
+			</ul>
+	
+	<div class="method-signature">
+		<span class="method-result">void</span>
+		<span class="method-name">
+			serialize
+		</span>
+					(<span class="var-type"></span>&nbsp;<span class="var-name">$source</span>)
+			</div>
+	
+			<ul class="parameters">
+					<li>
+				<span class="var-type"></span>
+				<span class="var-name">$source</span>			</li>
+				</ul>
+		
+			
+	</div>
+<a name="methodto_array" id="to_array"><!-- --></a>
+<div class="evenrow">
+	
+	<div class="method-header">
+		<span class="method-title">to_array</span> (line <span class="line-number">63</span>)
+	</div> 
+	
+	<!-- ========== Info from phpDoc block ========= -->
+	<ul class="tags">
+				<li><span class="field">access:</span> public</li>
+			</ul>
+	
+	<div class="method-signature">
+		<span class="method-result">void</span>
+		<span class="method-name">
+			to_array
+		</span>
+					([<span class="var-type"></span>&nbsp;<span class="var-name">$exclude</span> = <span class="var-default">array()</span>])
+			</div>
+	
+			<ul class="parameters">
+					<li>
+				<span class="var-type"></span>
+				<span class="var-name">$exclude</span>			</li>
+				</ul>
+		
+			<hr class="separator" />
+		<div class="notes">Redefinition of:</div>
+		<dl>
+			<dt><a href="../ShortStack/Model.html#methodto_array">Model::to_array()</a></dt>
+					</dl>
+			
+	</div>
+							<h4>Inherited Methods</h4>
+				<a name='inherited_methods'><!-- --></a>	
+									<!-- =========== Summary =========== -->
+					<p>Inherited From <span class="classname"><a href="../ShortStack/Model.html">Model</a></span></p>
+					<blockquote>
+													<span class="method-name"><a href="../ShortStack/Model.html#method__construct">Model::__construct()</a></span><br>
+													<span class="method-name"><a href="../ShortStack/Model.html#methodafterCreate">Model::afterCreate()</a></span><br>
+													<span class="method-name"><a href="../ShortStack/Model.html#methodafterDestroy">Model::afterDestroy()</a></span><br>
+													<span class="method-name"><a href="../ShortStack/Model.html#methodafterSave">Model::afterSave()</a></span><br>
+													<span class="method-name"><a href="../ShortStack/Model.html#methodbeforeCreate">Model::beforeCreate()</a></span><br>
+													<span class="method-name"><a href="../ShortStack/Model.html#methodbeforeDestroy">Model::beforeDestroy()</a></span><br>
+													<span class="method-name"><a href="../ShortStack/Model.html#methodbeforeSave">Model::beforeSave()</a></span><br>
+													<span class="method-name"><a href="../ShortStack/Model.html#methodCount">Model::Count()</a></span><br>
+													<span class="method-name"><a href="../ShortStack/Model.html#methodcreateTableForModel">Model::createTableForModel()</a></span><br>
+													<span class="method-name"><a href="../ShortStack/Model.html#methoddestroy">Model::destroy()</a></span><br>
+													<span class="method-name"><a href="../ShortStack/Model.html#methodFind">Model::Find()</a></span><br>
+													<span class="method-name"><a href="../ShortStack/Model.html#methodGet">Model::Get()</a></span><br>
+													<span class="method-name"><a href="../ShortStack/Model.html#methodgetChangedValues">Model::getChangedValues()</a></span><br>
+													<span class="method-name"><a href="../ShortStack/Model.html#methodhas">Model::has()</a></span><br>
+													<span class="method-name"><a href="../ShortStack/Model.html#methodhasChanged">Model::hasChanged()</a></span><br>
+													<span class="method-name"><a href="../ShortStack/Model.html#methodkill">Model::kill()</a></span><br>
+													<span class="method-name"><a href="../ShortStack/Model.html#methodRemove">Model::Remove()</a></span><br>
+													<span class="method-name"><a href="../ShortStack/Model.html#methodsave">Model::save()</a></span><br>
+													<span class="method-name"><a href="../ShortStack/Model.html#methodtoJSON">Model::toJSON()</a></span><br>
+													<span class="method-name"><a href="../ShortStack/Model.html#methodto_array">Model::to_array()</a></span><br>
+													<span class="method-name"><a href="../ShortStack/Model.html#methodto_json">Model::to_json()</a></span><br>
+													<span class="method-name"><a href="../ShortStack/Model.html#methodupdate">Model::update()</a></span><br>
+													<span class="method-name"><a href="../ShortStack/Model.html#methodupdateValues">Model::updateValues()</a></span><br>
+											</blockquote>
+										
+		</div>
+	</div>
+
+
+	<p class="notes" id="credit">
+		Documentation generated on Tue, 29 Dec 2009 17:33:47 -0600 by <a href="http://www.phpdoc.org" target="_blank">phpDocumentor 1.4.3</a>
+	</p>
+	</div></body>
+</html>
