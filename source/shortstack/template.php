@@ -1,7 +1,6 @@
 <?php
 
 class Template {
-  
   private $path;
   private $context;
   private $silent;

@@ -37,7 +37,6 @@ class Controller {
     echo $output;
   }
   
-  // TODO: ???Should this even be here???
   protected $sessionController = "session";
   protected $secured = false;
   
@@ -70,9 +69,7 @@ class Controller {
         try {
           echo Cache::Get($cname);
           exit(0);
-        } catch(StaleCache $e) {
-          // Do nothing!
-        }
+        } catch(StaleCache $e) {  }  // Do nothing!
       }
     }
   }
@@ -89,7 +86,7 @@ class Controller {
       if($useHTTP) {
         $this->_handleHttpAuth();
       } else {
-//        throw new Redirect($this->sessionController);
+        throw new Redirect($this->sessionController);
       }
     }
   }
@@ -115,27 +112,12 @@ class Controller {
     @ session_start();
     session_destroy();
   }
-  // end???
   
-  protected function isGet() {
-    return $_SERVER['REQUEST_METHOD'] == 'GET';
-  }
-
-  protected function isPost() {
-    return ($_SERVER['REQUEST_METHOD'] == 'POST' && @ !$_POST['_method']);
-  }
-
-  protected function isPut() {
-    return (@ $_SERVER['REQUEST_METHOD'] == 'PUT' || @ $_POST['_method'] == 'put');
-  }
-
-  protected function isDelete() {
-    return (@ $_SERVER['REQUEST_METHOD'] == 'DELETE' || @ $_POST['_method'] == 'delete' );
-  }
-
-  protected function isHead() {
-    return (@ $_SERVER['REQUEST_METHOD'] == 'HEAD' || @ $_POST['_method'] == 'head');
-  }
+  protected function isGet() { return $_SERVER['REQUEST_METHOD'] == 'GET'; }
+  protected function isPost() { return ($_SERVER['REQUEST_METHOD'] == 'POST' && @ !$_POST['_method']); }
+  protected function isPut() { return (@ $_SERVER['REQUEST_METHOD'] == 'PUT' || @ $_POST['_method'] == 'put'); }
+  protected function isDelete() { return (@ $_SERVER['REQUEST_METHOD'] == 'DELETE' || @ $_POST['_method'] == 'delete' ); }
+  protected function isHead() { return (@ $_SERVER['REQUEST_METHOD'] == 'HEAD' || @ $_POST['_method'] == 'head'); }
   
   protected function dispatchAction($path_segments) {
     $action = @ $path_segments[0]; //array_shift($path_segments);
@@ -148,16 +130,16 @@ class Controller {
     }
   }
  
- // Static methods
- private static $blacklisted_controllers = array();
- 
- public static function Blacklist() {
-   foreach (func_get_args() as $controller) {
-    self::$blacklisted_controllers[] = $controller;
-   }
- }
- 
- public static function IsAllowed($controller) {
-   return !in_array($controller, self::$blacklisted_controllers);
- }
+  // Static methods
+  private static $blacklisted_controllers = array();
+
+  public static function Blacklist() {
+    foreach (func_get_args() as $controller) {
+      self::$blacklisted_controllers[] = $controller;
+    }
+  }
+
+  public static function IsAllowed($controller) {
+    return !in_array($controller, self::$blacklisted_controllers);
+  }
 }

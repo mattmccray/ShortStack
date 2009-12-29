@@ -71,20 +71,5 @@ function get($modelName, $id=null) {
   else {
     return mdl($modelName, $id);
   }
-
-  // $inst = new $modelName();
-  // if($inst instanceof Document) {
-  //   return doc($modelName, $id);
-  // }
-  // else {
-  //   return mdl($modelName, $id);
-  // }
-
-  // $c = new ReflectionClass($modelName);
-  // if($c->isSubclassOf('Document')) {
-  //   return doc($modelName, $id);
-  // } else {
-  //   return mdl($modelName, $id);
-  // }
 }
 

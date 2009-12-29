@@ -1,11 +1,9 @@
 <?php
  
 class Document extends Model {
-
   public $id = null;
   public $created_on = null;
   public $updated_on = null;
-  
   protected $rawData = null;
   protected $indexes = array();
   
@@ -73,11 +71,24 @@ class Document extends Model {
     return $wasSuccessful;
   }
   
+  public function to_array($exclude=array()) {
+    $attrs = array(
+      'id'=>$this->id,
+      'created_on'=>$this->created_on,
+      'updated_on'=>$this->updated_on,
+    );
+    foreach($this->data as $col=>$value) {
+      if(!in_array($col, $exclude)) {
+        $attrs[$col] = $this->$col;
+      }
+    }
+    return $attrs;
+  }
+  
   protected function _handleSqlCreate() {
     $mdlRes = parent::_handleSqlCreate();
-    // Create index tables...
     $idxRes = true;
-    foreach ($this->indexes as $field=>$fType) {
+    foreach ($this->indexes as $field=>$fType) { // Create index tables...
       $indexSQL = "CREATE TABLE IF NOT EXISTS ". $this->modelName ."_". $field ."_idx ( id INTEGER PRIMARY KEY, docid INTEGER, ". $field ." ". $fType ." );";
       if(DB::Query( $indexSQL ) == false) $idxRes = false;
     }
@@ -129,36 +140,19 @@ class Document extends Model {
     return json_encode($source);
   }
 
-  // Used internally only... Triggers callbacks.
-  private function _serialize() {
+  private function _serialize() { // Used internally only... Triggers callbacks.
     $this->beforeSerialize();
     $this->rawData = htmlentities( $this->serialize( $this->data ), ENT_QUOTES );
     $this->afterSerialize(); // ??: Should the results be passed in to allow massaging?
     return $this;
   }
-  private function _deserialize() {
+  private function _deserialize() { // Used internally only... Triggers callbacks.
     $this->beforeDeserialize();
     $this->data = $this->deserialize( html_entity_decode($this->rawData, ENT_QUOTES) );
     $this->afterDeserialize(); // ??: Should the results be passed in to allow massaging?
     return $this;
   }
-  
-  public function to_array($exclude=array()) {
-    $attrs = array(
-      'id'=>$this->id,
-      'created_on'=>$this->created_on,
-      'updated_on'=>$this->updated_on,
-    );
-    foreach($this->data as $col=>$value) {
-      if(!in_array($col, $exclude)) {
-        $attrs[$col] = $this->$col;
-      }
-    }
-    return $attrs;
-  }
-  
-  // Static Methods
-  
+    
   public static $IsModel = false;
   public static $IsDocument = true;
 
@@ -169,7 +163,6 @@ class Document extends Model {
   public static function Find($doctype) {
     return new DocumentFinder($doctype);
   }
-  
 }
 
 

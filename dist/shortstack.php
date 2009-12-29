@@ -23,7 +23,6 @@ class StaleCache extends Exception { }
 
 class ShortStack {
   public static function AutoLoadFinder($className) {
-    global $shortstack_config;
     if(strpos($className, 'ontroller') > 0) {
       return self::ControllerPath( underscore($className) );
     } else if(strpos($className, 'elper') > 0) {
@@ -34,11 +33,11 @@ class ShortStack {
   }
   // Loads all models in the models/ folder and returns the model class names
   public static function LoadAllModels() {
-    global $shortstack_config;
     $model_files = glob( self::ModelPath("*") );
     $classNames = array();
     foreach($model_files as $filename) {
-      $className = str_replace($shortstack_config['models']['folder']."/", "", $filename);
+      $path = explode('/', $filename);
+      $className = array_slice($path, -1);
       $className = str_replace(".php", "", $className);
       require_once($filename);
       $classNames[] = camelize($className);
@@ -48,11 +47,10 @@ class ShortStack {
   // Create all the tables needs for the models and documentmodels...
   public static function InitializeDatabase() {
     $modelnames = ShortStack::LoadAllModels();
-    $needDocInit = false;
     foreach($modelnames as $modelName) {
       $mdl = new $modelName;
       if($mdl instanceof Model) {
-        $results = $mdl->createTableForModel();
+        $mdl->createTableForModel();
       }
     }
     return $modelnames;
@@ -71,11 +69,11 @@ class ShortStack {
     return self::GetPathFor('helpers', $path);
   }
   public static function CachePath($path) {
-    return self::GetPathFor('cacheing', $path);
+    return self::GetPathFor('cacheing', $path, '.html');
   }
-  protected static function GetPathFor($type, $path) {
+  protected static function GetPathFor($type, $path, $suffix=".php") {
     global $shortstack_config;
-    return $shortstack_config[$type]['folder']."/".$path.".php";
+    return $shortstack_config[$type]['folder']."/".$path.$suffix;
   }
 }
 
@@ -151,21 +149,6 @@ function get($modelName, $id=null) {
   else {
     return mdl($modelName, $id);
   }
-
-  // $inst = new $modelName();
-  // if($inst instanceof Document) {
-  //   return doc($modelName, $id);
-  // }
-  // else {
-  //   return mdl($modelName, $id);
-  // }
-
-  // $c = new ReflectionClass($modelName);
-  // if($c->isSubclassOf('Document')) {
-  //   return doc($modelName, $id);
-  // } else {
-  //   return mdl($modelName, $id);
-  // }
 }
 
 
@@ -309,7 +292,6 @@ class Controller {
     echo $output;
   }
   
-  // TODO: ???Should this even be here???
   protected $sessionController = "session";
   protected $secured = false;
   
@@ -342,9 +324,7 @@ class Controller {
         try {
           echo Cache::Get($cname);
           exit(0);
-        } catch(StaleCache $e) {
-          // Do nothing!
-        }
+        } catch(StaleCache $e) {  }  // Do nothing!
       }
     }
   }
@@ -361,7 +341,7 @@ class Controller {
       if($useHTTP) {
         $this->_handleHttpAuth();
       } else {
-//        throw new Redirect($this->sessionController);
+        throw new Redirect($this->sessionController);
       }
     }
   }
@@ -387,27 +367,12 @@ class Controller {
     @ session_start();
     session_destroy();
   }
-  // end???
   
-  protected function isGet() {
-    return $_SERVER['REQUEST_METHOD'] == 'GET';
-  }
-
-  protected function isPost() {
-    return ($_SERVER['REQUEST_METHOD'] == 'POST' && @ !$_POST['_method']);
-  }
-
-  protected function isPut() {
-    return (@ $_SERVER['REQUEST_METHOD'] == 'PUT' || @ $_POST['_method'] == 'put');
-  }
-
-  protected function isDelete() {
-    return (@ $_SERVER['REQUEST_METHOD'] == 'DELETE' || @ $_POST['_method'] == 'delete' );
-  }
-
-  protected function isHead() {
-    return (@ $_SERVER['REQUEST_METHOD'] == 'HEAD' || @ $_POST['_method'] == 'head');
-  }
+  protected function isGet() { return $_SERVER['REQUEST_METHOD'] == 'GET'; }
+  protected function isPost() { return ($_SERVER['REQUEST_METHOD'] == 'POST' && @ !$_POST['_method']); }
+  protected function isPut() { return (@ $_SERVER['REQUEST_METHOD'] == 'PUT' || @ $_POST['_method'] == 'put'); }
+  protected function isDelete() { return (@ $_SERVER['REQUEST_METHOD'] == 'DELETE' || @ $_POST['_method'] == 'delete' ); }
+  protected function isHead() { return (@ $_SERVER['REQUEST_METHOD'] == 'HEAD' || @ $_POST['_method'] == 'head'); }
   
   protected function dispatchAction($path_segments) {
     $action = @ $path_segments[0]; //array_shift($path_segments);
@@ -420,23 +385,20 @@ class Controller {
     }
   }
  
- // Static methods
- private static $blacklisted_controllers = array();
- 
- public static function Blacklist() {
-   foreach (func_get_args() as $controller) {
-    self::$blacklisted_controllers[] = $controller;
-   }
- }
- 
- public static function IsAllowed($controller) {
-   return !in_array($controller, self::$blacklisted_controllers);
- }
+  // Static methods
+  private static $blacklisted_controllers = array();
+
+  public static function Blacklist() {
+    foreach (func_get_args() as $controller) {
+      self::$blacklisted_controllers[] = $controller;
+    }
+  }
+
+  public static function IsAllowed($controller) {
+    return !in_array($controller, self::$blacklisted_controllers);
+  }
 }
 class DB {
-  
-  // TODO: Change function names to TitleCase
-  
   static protected $pdo;
   
   static public function Connect($conn, $user="", $pass="", $options=array()) {
@@ -465,7 +427,6 @@ class DB {
   static public function EnsureNotEmpty() {
     $statement = self::Query('SELECT name FROM sqlite_master WHERE type = \'table\'');
     $result = $statement->fetchAll();
-        
     if( sizeof($result) == 0 ){
       define("EMPTYDB", true);
       throw new EmptyDbException("Database has no tables.");
@@ -475,7 +436,6 @@ class DB {
   }
 }
 class ModelFinder implements IteratorAggregate {
-  
   protected $objtype;
   protected $matcher = false;
   protected $finder = array();
@@ -508,8 +468,8 @@ class ModelFinder implements IteratorAggregate {
     return $this->matcher;
   }
   
-  // TODO: Change this to replace the order array, and possibly use func_get_args()
   public function order($field, $dir='ASC') {
+    // TODO: Change this to replace the order array, and possibly use func_get_args()
     $this->__cache = false;
     $this->order[$field] = $dir;
     return $this;
@@ -531,7 +491,6 @@ class ModelFinder implements IteratorAggregate {
     $sql = $this->_buildSQL(true);
     $res = DB::FetchAll($sql);
     return intVal( $res[0]['count'] );  
-//    return count($this->fetch($ignoreCache));
   }
   
   public function get($ignoreCache=false) {   // Returns the first match
@@ -548,9 +507,8 @@ class ModelFinder implements IteratorAggregate {
   public function fetch($ignoreCache=false) { // Executes current query
     return $this->_execQuery($ignoreCache);
   }
-  
-  // Returns the raw resultset...
-  public function raw($ignoreCache=true) {
+    
+  public function raw($ignoreCache=true) { // Returns the raw resultset...
     $sql = $this->_buildSQL();
     $stmt = DB::Query($sql);
     return $stmt->fetchAll();
@@ -561,15 +519,13 @@ class ModelFinder implements IteratorAggregate {
     return new ArrayIterator($docs);
   }
   
-// Warning these modified the matched records!!
-
+  // Warning these modified the matched records!!
   public function destroy() {
     foreach ($this as $doc) {
       $doc->destroy();
     }
     $this->__cache = false;
   }
-
   public function update($values=array()) {
     foreach ($this as $doc) {
       $doc->update($values);
@@ -585,7 +541,6 @@ class ModelFinder implements IteratorAggregate {
     else $this->finder[] = $finder_filter;
     return $this;
   }
-  
   
   protected function _execQuery($ignoreCache=false) {
     if($ignoreCache == false && $this->__cache != false) return $this->__cache;
@@ -604,7 +559,6 @@ class ModelFinder implements IteratorAggregate {
     return $items;
   }
   
-  // Model _buildSQL
   protected function _buildSQL($isCount=false) {
     if($isCount)
       $sql = "SELECT count(id) as count FROM ". $this->objtype ." ";
@@ -681,16 +635,11 @@ class FinderMatch {
   }
 }
 
-//TODO: Figure out what to do for hasMany relationships onDestroy (for throughs, kill the joins. Otherwise?)
-
 class Model {
-
     public $modelName = null;
-    
     protected $data = false;
     protected $isNew = false;
     protected $isDirty = false;
-
     protected $schema = array();
     protected $hasMany = array();
     protected $belongsTo = array();
@@ -737,6 +686,91 @@ class Model {
       else {
         return NULL; // FIXME: What to do here? Throw exception when __call is bad?
       }
+    }
+    
+    public function has($key) {
+      return array_key_exists($key, $this->data);
+    }
+    
+    public function updateValues($values=array()) {
+      foreach($values as $key=>$value) {
+        $this->$key = $value;
+      }
+      return $this;
+    }
+    
+    public function update($values=array()) {
+      return $this->updateValues($values);
+    }
+    
+    public function hasChanged($key) {
+      return in_array($key, $this->changedFields);
+    }
+    
+    public function getChangedValues() {
+      $valid_atts = array_keys( $this->schema );
+      $cleanChangedFields = array();
+      $results = array();
+      foreach($this->changedFields as $fieldname) {
+        if(in_array($fieldname, $valid_atts)) { // Stringifies everything, is this really ideal?
+          $results[$fieldname] = '"'.htmlentities($this->$fieldname, ENT_QUOTES).'"';
+          $cleanChangedFields[] = $fieldname;
+        }
+      }
+      $this->changedFields = $cleanChangedFields;
+      return $results;
+    }
+
+    public function save() {
+      $result = true;
+      if($this->isDirty) {
+        $this->beforeSave();
+        if($this->isNew) { // Create
+          $this->beforeCreate();
+          $result = $this->_handleSqlInsert();
+          $this->afterCreate();
+        }
+        else { // Update
+          $result = $this->_handleSqlUpdate();
+        }
+        $this->changedFields = array();
+        $this->isDirty = false;
+        $this->isNew = false;
+        $this->afterSave();
+      }
+      return $result;
+    }
+    
+    public function destroy(){
+      $this->beforeDestroy();
+      $thisDel = $this->_handleSqlDelete();
+      $relDel = $this->_handleRelatedSqlDelete();
+      $this->afterDestroy();
+      return ($thisDel && $relDel);
+    }
+
+    public function kill(){ // WARNING: This doesn't trigger the callbacks!
+      $thisDel = $this->_handleSqlDelete();
+      $relDel = $this->_handleRelatedSqlDelete();
+      return ($thisDel && $relDel);
+    }
+    
+    public function to_array($exclude=array()) {
+      $attrs = array();
+      foreach($this->data as $col=>$value) {
+        if(!in_array($col, $exclude)) {
+          $attrs[$col] = $this->$col;
+        }
+      }
+      return $attrs;
+    }
+    
+    public function to_json($exclude=array()) {
+      return Model::toJSON( $this->to_array($exclude) );
+    }
+    
+    public function createTableForModel() {
+      return $this->_handleSqlCreate();
     }
     
     protected function _handleHasMany($method, $args) {
@@ -803,85 +837,6 @@ class Model {
       return $this;
     }
     
-    public function has($key) {
-      return array_key_exists($key, $this->data);
-    }
-    
-    public function updateValues($values=array()) {
-      foreach($values as $key=>$value) {
-        $this->$key = $value;
-      }
-      return $this;
-    }
-    
-    public function update($values=array()) {
-      return $this->updateValues($values);
-    }
-    
-    public function hasChanged($key) {
-      return in_array($key, $this->changedFields);
-    }
-    
-    public function getChangedValues() {
-      $valid_atts = array_keys( $this->schema );
-      $cleanChangedFields = array();
-      $results = array();
-      foreach($this->changedFields as $fieldname) {
-        if(in_array($fieldname, $valid_atts)) {
-          // Stringifies everything, is this really ideal?
-          $results[$fieldname] = '"'.htmlentities($this->$fieldname, ENT_QUOTES).'"';
-          $cleanChangedFields[] = $fieldname;
-        }
-      }
-      $this->changedFields = $cleanChangedFields;
-      return $results;
-    }
-
-    public function save() {
-      $result = true;
-      if($this->isDirty) {
-        $this->beforeSave();
-        if($this->isNew) {
-          // Create
-          $this->beforeCreate();
-          $result = $this->_handleSqlInsert();
-          $this->afterCreate();
-        } else {
-          // Update
-          $result = $this->_handleSqlUpdate();
-        }
-        $this->changedFields = array();
-        $this->isDirty = false;
-        $this->isNew = false;
-        $this->afterSave();
-      }
-      return $result;
-    }
-    
-    public function destroy(){
-      $this->beforeDestroy();
-      $thisDel = $this->_handleSqlDelete();
-      $relDel = $this->_handleRelatedSqlDelete();
-      $this->afterDestroy();
-      return ($thisDel && $relDel);
-    }
-
-    // WARNING: This doesn't trigger the callbacks!
-    public function kill(){
-      $thisDel = $this->_handleSqlDelete();
-      $relDel = $this->_handleRelatedSqlDelete();
-      return ($thisDel && $relDel);
-    }
-    
-    // Callbacks
-    protected function beforeSave() {}
-    protected function afterSave() {}
-    protected function beforeCreate() {}
-    protected function afterCreate() {}
-    protected function beforeDestroy() {}
-    protected function afterDestroy() {}
-
-    // Override these in subclasses...
     protected function _handleSqlCreate() {
       $sql = "CREATE TABLE IF NOT EXISTS ";
       $sql.= $this->modelName ." ( ";
@@ -956,25 +911,13 @@ class Model {
       return true;
     }
     
-    public function to_array($exclude=array()) {
-      $attrs = array();
-      foreach($this->data as $col=>$value) {
-        if(!in_array($col, $exclude)) {
-          $attrs[$col] = $this->$col;
-        }
-      }
-      return $attrs;
-    }
-    
-    public function to_json($exclude=array()) {
-      return Model::toJSON( $this->to_array($exclude) );
-    }
-    
-    public function createTableForModel() {
-      return $this->_handleSqlCreate();
-    }
-
-// Static Helper Methods...
+    // Callbacks
+    protected function beforeSave() {}
+    protected function afterSave() {}
+    protected function beforeCreate() {}
+    protected function afterCreate() {}
+    protected function beforeDestroy() {}
+    protected function afterDestroy() {}
 
     public static $IsModel = true;
     public static $IsDocument = false;
@@ -1021,9 +964,7 @@ class Model {
     }
 }
 
-
 class Joiner extends Model {
-  
   protected $joins = array(); // OVERRIDE ME!
   private $srcModel;
   private $toModel;
@@ -1066,11 +1007,9 @@ class Joiner extends Model {
 }
  
 class Document extends Model {
-
   public $id = null;
   public $created_on = null;
   public $updated_on = null;
-  
   protected $rawData = null;
   protected $indexes = array();
   
@@ -1138,11 +1077,24 @@ class Document extends Model {
     return $wasSuccessful;
   }
   
+  public function to_array($exclude=array()) {
+    $attrs = array(
+      'id'=>$this->id,
+      'created_on'=>$this->created_on,
+      'updated_on'=>$this->updated_on,
+    );
+    foreach($this->data as $col=>$value) {
+      if(!in_array($col, $exclude)) {
+        $attrs[$col] = $this->$col;
+      }
+    }
+    return $attrs;
+  }
+  
   protected function _handleSqlCreate() {
     $mdlRes = parent::_handleSqlCreate();
-    // Create index tables...
     $idxRes = true;
-    foreach ($this->indexes as $field=>$fType) {
+    foreach ($this->indexes as $field=>$fType) { // Create index tables...
       $indexSQL = "CREATE TABLE IF NOT EXISTS ". $this->modelName ."_". $field ."_idx ( id INTEGER PRIMARY KEY, docid INTEGER, ". $field ." ". $fType ." );";
       if(DB::Query( $indexSQL ) == false) $idxRes = false;
     }
@@ -1194,36 +1146,19 @@ class Document extends Model {
     return json_encode($source);
   }
 
-  // Used internally only... Triggers callbacks.
-  private function _serialize() {
+  private function _serialize() { // Used internally only... Triggers callbacks.
     $this->beforeSerialize();
     $this->rawData = htmlentities( $this->serialize( $this->data ), ENT_QUOTES );
     $this->afterSerialize(); // ??: Should the results be passed in to allow massaging?
     return $this;
   }
-  private function _deserialize() {
+  private function _deserialize() { // Used internally only... Triggers callbacks.
     $this->beforeDeserialize();
     $this->data = $this->deserialize( html_entity_decode($this->rawData, ENT_QUOTES) );
     $this->afterDeserialize(); // ??: Should the results be passed in to allow massaging?
     return $this;
   }
-  
-  public function to_array($exclude=array()) {
-    $attrs = array(
-      'id'=>$this->id,
-      'created_on'=>$this->created_on,
-      'updated_on'=>$this->updated_on,
-    );
-    foreach($this->data as $col=>$value) {
-      if(!in_array($col, $exclude)) {
-        $attrs[$col] = $this->$col;
-      }
-    }
-    return $attrs;
-  }
-  
-  // Static Methods
-  
+    
   public static $IsModel = false;
   public static $IsDocument = true;
 
@@ -1234,7 +1169,6 @@ class Document extends Model {
   public static function Find($doctype) {
     return new DocumentFinder($doctype);
   }
-  
 }
 
 
@@ -1336,17 +1270,7 @@ class DocumentFinder extends ModelFinder {
     return $col; 
   }  
 }
-
-/*
-  Usage:
-
-  $pgr = new Pager( get('Post')->where('author')->eq('matt'));
-
-  
-*/
-
 class Pager implements IteratorAggregate {
-
   protected $finder = null;
   public $pageSize = 10;
   public $currentPage = 0;
@@ -1373,8 +1297,7 @@ class Pager implements IteratorAggregate {
       $this->currentPage = intVal($page);
   }
   
-  public function count() {
-    // Count the number of pages...
+  public function count() { // Count the number of pages...
     $this->finder->limit(0)->offset(0);
     $total = $this->finder->count();
     return ceil( $total / $this->pageSize );
@@ -1388,11 +1311,9 @@ class Pager implements IteratorAggregate {
   public function getIterator() { // For using the finder as an array in foreach() statements
     return new ArrayIterator( $this->item() );
   }
-  
 }
 
 class Template {
-  
   private $path;
   private $context;
   private $silent;

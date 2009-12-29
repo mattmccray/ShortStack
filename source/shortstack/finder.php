@@ -1,7 +1,6 @@
 <?php
 
 class ModelFinder implements IteratorAggregate {
-  
   protected $objtype;
   protected $matcher = false;
   protected $finder = array();
@@ -34,8 +33,8 @@ class ModelFinder implements IteratorAggregate {
     return $this->matcher;
   }
   
-  // TODO: Change this to replace the order array, and possibly use func_get_args()
   public function order($field, $dir='ASC') {
+    // TODO: Change this to replace the order array, and possibly use func_get_args()
     $this->__cache = false;
     $this->order[$field] = $dir;
     return $this;
@@ -57,7 +56,6 @@ class ModelFinder implements IteratorAggregate {
     $sql = $this->_buildSQL(true);
     $res = DB::FetchAll($sql);
     return intVal( $res[0]['count'] );  
-//    return count($this->fetch($ignoreCache));
   }
   
   public function get($ignoreCache=false) {   // Returns the first match
@@ -74,9 +72,8 @@ class ModelFinder implements IteratorAggregate {
   public function fetch($ignoreCache=false) { // Executes current query
     return $this->_execQuery($ignoreCache);
   }
-  
-  // Returns the raw resultset...
-  public function raw($ignoreCache=true) {
+    
+  public function raw($ignoreCache=true) { // Returns the raw resultset...
     $sql = $this->_buildSQL();
     $stmt = DB::Query($sql);
     return $stmt->fetchAll();
@@ -87,15 +84,13 @@ class ModelFinder implements IteratorAggregate {
     return new ArrayIterator($docs);
   }
   
-// Warning these modified the matched records!!
-
+  // Warning these modified the matched records!!
   public function destroy() {
     foreach ($this as $doc) {
       $doc->destroy();
     }
     $this->__cache = false;
   }
-
   public function update($values=array()) {
     foreach ($this as $doc) {
       $doc->update($values);
@@ -111,7 +106,6 @@ class ModelFinder implements IteratorAggregate {
     else $this->finder[] = $finder_filter;
     return $this;
   }
-  
   
   protected function _execQuery($ignoreCache=false) {
     if($ignoreCache == false && $this->__cache != false) return $this->__cache;
@@ -130,7 +124,6 @@ class ModelFinder implements IteratorAggregate {
     return $items;
   }
   
-  // Model _buildSQL
   protected function _buildSQL($isCount=false) {
     if($isCount)
       $sql = "SELECT count(id) as count FROM ". $this->objtype ." ";

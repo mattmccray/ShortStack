@@ -1,15 +1,6 @@
 <?php
 
-/*
-  Usage:
-
-  $pgr = new Pager( get('Post')->where('author')->eq('matt'));
-
-  
-*/
-
 class Pager implements IteratorAggregate {
-
   protected $finder = null;
   public $pageSize = 10;
   public $currentPage = 0;
@@ -36,8 +27,7 @@ class Pager implements IteratorAggregate {
       $this->currentPage = intVal($page);
   }
   
-  public function count() {
-    // Count the number of pages...
+  public function count() { // Count the number of pages...
     $this->finder->limit(0)->offset(0);
     $total = $this->finder->count();
     return ceil( $total / $this->pageSize );
@@ -51,5 +41,4 @@ class Pager implements IteratorAggregate {
   public function getIterator() { // For using the finder as an array in foreach() statements
     return new ArrayIterator( $this->item() );
   }
-  
 }

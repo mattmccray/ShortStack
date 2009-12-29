@@ -1,9 +1,6 @@
 <?php
 
 class DB {
-  
-  // TODO: Change function names to TitleCase
-  
   static protected $pdo;
   
   static public function Connect($conn, $user="", $pass="", $options=array()) {
@@ -32,7 +29,6 @@ class DB {
   static public function EnsureNotEmpty() {
     $statement = self::Query('SELECT name FROM sqlite_master WHERE type = \'table\'');
     $result = $statement->fetchAll();
-        
     if( sizeof($result) == 0 ){
       define("EMPTYDB", true);
       throw new EmptyDbException("Database has no tables.");

@@ -1,15 +1,10 @@
 <?php
 
-//TODO: Figure out what to do for hasMany relationships onDestroy (for throughs, kill the joins. Otherwise?)
-
 class Model {
-
     public $modelName = null;
-    
     protected $data = false;
     protected $isNew = false;
     protected $isDirty = false;
-
     protected $schema = array();
     protected $hasMany = array();
     protected $belongsTo = array();
@@ -56,6 +51,91 @@ class Model {
       else {
         return NULL; // FIXME: What to do here? Throw exception when __call is bad?
       }
+    }
+    
+    public function has($key) {
+      return array_key_exists($key, $this->data);
+    }
+    
+    public function updateValues($values=array()) {
+      foreach($values as $key=>$value) {
+        $this->$key = $value;
+      }
+      return $this;
+    }
+    
+    public function update($values=array()) {
+      return $this->updateValues($values);
+    }
+    
+    public function hasChanged($key) {
+      return in_array($key, $this->changedFields);
+    }
+    
+    public function getChangedValues() {
+      $valid_atts = array_keys( $this->schema );
+      $cleanChangedFields = array();
+      $results = array();
+      foreach($this->changedFields as $fieldname) {
+        if(in_array($fieldname, $valid_atts)) { // Stringifies everything, is this really ideal?
+          $results[$fieldname] = '"'.htmlentities($this->$fieldname, ENT_QUOTES).'"';
+          $cleanChangedFields[] = $fieldname;
+        }
+      }
+      $this->changedFields = $cleanChangedFields;
+      return $results;
+    }
+
+    public function save() {
+      $result = true;
+      if($this->isDirty) {
+        $this->beforeSave();
+        if($this->isNew) { // Create
+          $this->beforeCreate();
+          $result = $this->_handleSqlInsert();
+          $this->afterCreate();
+        }
+        else { // Update
+          $result = $this->_handleSqlUpdate();
+        }
+        $this->changedFields = array();
+        $this->isDirty = false;
+        $this->isNew = false;
+        $this->afterSave();
+      }
+      return $result;
+    }
+    
+    public function destroy(){
+      $this->beforeDestroy();
+      $thisDel = $this->_handleSqlDelete();
+      $relDel = $this->_handleRelatedSqlDelete();
+      $this->afterDestroy();
+      return ($thisDel && $relDel);
+    }
+
+    public function kill(){ // WARNING: This doesn't trigger the callbacks!
+      $thisDel = $this->_handleSqlDelete();
+      $relDel = $this->_handleRelatedSqlDelete();
+      return ($thisDel && $relDel);
+    }
+    
+    public function to_array($exclude=array()) {
+      $attrs = array();
+      foreach($this->data as $col=>$value) {
+        if(!in_array($col, $exclude)) {
+          $attrs[$col] = $this->$col;
+        }
+      }
+      return $attrs;
+    }
+    
+    public function to_json($exclude=array()) {
+      return Model::toJSON( $this->to_array($exclude) );
+    }
+    
+    public function createTableForModel() {
+      return $this->_handleSqlCreate();
     }
     
     protected function _handleHasMany($method, $args) {
@@ -122,85 +202,6 @@ class Model {
       return $this;
     }
     
-    public function has($key) {
-      return array_key_exists($key, $this->data);
-    }
-    
-    public function updateValues($values=array()) {
-      foreach($values as $key=>$value) {
-        $this->$key = $value;
-      }
-      return $this;
-    }
-    
-    public function update($values=array()) {
-      return $this->updateValues($values);
-    }
-    
-    public function hasChanged($key) {
-      return in_array($key, $this->changedFields);
-    }
-    
-    public function getChangedValues() {
-      $valid_atts = array_keys( $this->schema );
-      $cleanChangedFields = array();
-      $results = array();
-      foreach($this->changedFields as $fieldname) {
-        if(in_array($fieldname, $valid_atts)) {
-          // Stringifies everything, is this really ideal?
-          $results[$fieldname] = '"'.htmlentities($this->$fieldname, ENT_QUOTES).'"';
-          $cleanChangedFields[] = $fieldname;
-        }
-      }
-      $this->changedFields = $cleanChangedFields;
-      return $results;
-    }
-
-    public function save() {
-      $result = true;
-      if($this->isDirty) {
-        $this->beforeSave();
-        if($this->isNew) {
-          // Create
-          $this->beforeCreate();
-          $result = $this->_handleSqlInsert();
-          $this->afterCreate();
-        } else {
-          // Update
-          $result = $this->_handleSqlUpdate();
-        }
-        $this->changedFields = array();
-        $this->isDirty = false;
-        $this->isNew = false;
-        $this->afterSave();
-      }
-      return $result;
-    }
-    
-    public function destroy(){
-      $this->beforeDestroy();
-      $thisDel = $this->_handleSqlDelete();
-      $relDel = $this->_handleRelatedSqlDelete();
-      $this->afterDestroy();
-      return ($thisDel && $relDel);
-    }
-
-    // WARNING: This doesn't trigger the callbacks!
-    public function kill(){
-      $thisDel = $this->_handleSqlDelete();
-      $relDel = $this->_handleRelatedSqlDelete();
-      return ($thisDel && $relDel);
-    }
-    
-    // Callbacks
-    protected function beforeSave() {}
-    protected function afterSave() {}
-    protected function beforeCreate() {}
-    protected function afterCreate() {}
-    protected function beforeDestroy() {}
-    protected function afterDestroy() {}
-
-    // Override these in subclasses...
     protected function _handleSqlCreate() {
       $sql = "CREATE TABLE IF NOT EXISTS ";
       $sql.= $this->modelName ." ( ";
@@ -275,25 +276,13 @@ class Model {
       return true;
     }
     
-    public function to_array($exclude=array()) {
-      $attrs = array();
-      foreach($this->data as $col=>$value) {
-        if(!in_array($col, $exclude)) {
-          $attrs[$col] = $this->$col;
-        }
-      }
-      return $attrs;
-    }
-    
-    public function to_json($exclude=array()) {
-      return Model::toJSON( $this->to_array($exclude) );
-    }
-    
-    public function createTableForModel() {
-      return $this->_handleSqlCreate();
-    }
-
-// Static Helper Methods...
+    // Callbacks
+    protected function beforeSave() {}
+    protected function afterSave() {}
+    protected function beforeCreate() {}
+    protected function afterCreate() {}
+    protected function beforeDestroy() {}
+    protected function afterDestroy() {}
 
     public static $IsModel = true;
     public static $IsDocument = false;
@@ -340,9 +329,7 @@ class Model {
     }
 }
 
-
 class Joiner extends Model {
-  
   protected $joins = array(); // OVERRIDE ME!
   private $srcModel;
   private $toModel;
