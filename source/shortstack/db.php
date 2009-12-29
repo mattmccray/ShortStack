@@ -2,16 +2,16 @@
 
 class DB {
   static protected $pdo;
-  
+
   static public function Connect($conn, $user="", $pass="", $options=array()) {
     self::$pdo = new PDO($conn, $user, $pass, $options);
     return self::$pdo;
   }
-  
+
   static public function Query($sql_string) {
     return self::$pdo->query($sql_string);
   }
-  
+
   static public function GetLastError() {
     return self::$pdo->errorInfo();
   }
@@ -25,7 +25,7 @@ class DB {
       throw new DbException("Error:\n\t".$err[2]."\nWas thrown by SQL:\n\t".$sql_string);
     }
   }
-  
+
   static public function EnsureNotEmpty() {
     $statement = self::Query('SELECT name FROM sqlite_master WHERE type = \'table\'');
     $result = $statement->fetchAll();

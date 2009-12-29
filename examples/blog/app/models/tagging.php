@@ -1,6 +1,6 @@
 <?php 
 
-class Tagging extends Joiner {
+class Tagging extends ModelJoiner {
 
   protected $joins = array( 'Post', 'Tag' );
 

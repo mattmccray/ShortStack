@@ -17,16 +17,19 @@ function slugify($str) {
    return $slug;
 }
 
-function underscore($str) {  
+function underscore($str) {
   $str = str_replace("-", " ", $str);
   $str = preg_replace_callback('/[A-Z]/', "underscore_matcher", trim($str));
   $str = str_replace(" ", "", $str);
   $str = preg_replace("/^[_]?(.*)$/", "$1", $str);
-  return $str;  
+  return $str;
 }
+/**
+ * @ignore
+ */
 function underscore_matcher($match) { return "_" . strtolower($match[0]); }
 
-function camelize($str) {		
+function camelize($str) {
   $str = str_replace("-", "", $str);
 	$str = 'x '.strtolower(trim($str));
 	$str = ucwords(preg_replace('/[\s_]+/', ' ', $str));
@@ -37,7 +40,9 @@ function use_helper($helper) {
   if(! strpos($helper, 'elper') > 0) $helper .= "_helper";
   require_once( ShortStack::HelperPath($helper) );
 }
-
+/**
+ * @ignore
+ */
 function getBaseUri() { // Used by the Dispatcher
 	return str_replace("/".$_SERVER['QUERY_STRING'], "/", array_shift(explode("?", $_SERVER['REQUEST_URI'])));
 }
@@ -49,27 +54,14 @@ function debug($obj) {
 }
 
 function doc($doctype, $id=null) {// For use with documents
-  if($id != null) {
-    return Document::Get($doctype, $id);
-  } else {
-    return Document::Find($doctype);
-  }
+  return ($id == null) ? Document::Find($doctype) : Document::Get($doctype, $id);
 }
 
 function mdl($objtype, $id=null) {// For use with documents
-  if($id != null) {
-    return Model::Get($objtype, $id);
-  } else {
-    return Model::Find($objtype);
-  }
+  return ($id == null) ? Model::Find($objtype) :  Model::Get($objtype, $id);
 }
 
 function get($modelName, $id=null) {
-  if($modelName::$IsDocument) {
-    return doc($modelName, $id);
-  }
-  else {
-    return mdl($modelName, $id);
-  }
+  return ($modelName::$IsDocument) ? doc($modelName, $id) : mdl($modelName, $id);
 }
 

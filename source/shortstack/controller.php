@@ -4,7 +4,7 @@ class Controller {
   protected $defaultLayout = "_layout";
   protected $cacheName = false;
   protected $cacheOutput = true;
-  
+
   // Default execute method... Feel free to override.
   function execute($args=array()) {
     $this->cacheName = get_class($this)."-".join('_', $args);
@@ -12,17 +12,17 @@ class Controller {
     $this->_preferCached();
     $this->dispatchAction($args);
   }
-  
+
   function index($params=array()) {
     throw new NotFoundException("Action <code>index</code> not implemented.");
   }
-  
+
   function render($view, $params=array(), $wrapInLayout=null) {
     $tmpl = new Template( ShortStack::ViewPath($view) );
     $content = $tmpl->fetch($params);
     $this->renderText($content, $params, $wrapInLayout);
   }
-  
+
   function renderText($text, $params=array(), $wrapInLayout=null) {
     $layoutView = ($wrapInLayout == null) ? $this->defaultLayout : $wrapInLayout;
     $output = '';
@@ -36,15 +36,15 @@ class Controller {
     $this->_cacheContent($output);
     echo $output;
   }
-  
+
   protected $sessionController = "session";
   protected $secured = false;
-  
+
   // OVERRIDE THIS!!!!
   function authenticate($username, $password) {
     return false;
   }
-  
+
   protected function _handleHttpAuth($realm="Authorization Required", $force=false) {
     if (!isset($_SERVER['PHP_AUTH_USER']) || $force == true) {
       header('WWW-Authenticate: Basic realm="'.$realm.'"');
@@ -73,14 +73,14 @@ class Controller {
       }
     }
   }
-  
+
   protected function _cacheContent($content, $name=null) {
     if($this->cacheOutput) {
       $cname = ($name == null) ? $this->cacheName : $name;
       Cache::Save($cname, $content);
     }
   }
-  
+
   protected function ensureLoggedIn($useHTTP=false) {
     if (!$this->isLoggedIn()) {
       if($useHTTP) {
@@ -90,12 +90,12 @@ class Controller {
       }
     }
   }
-  
+
   protected function isLoggedIn() {
     @ session_start();
     return isset($_SESSION['CURRENT_USER']);
   }
-  
+
   protected function doLogin($src=array()) {
     if($this->authenticate($src['username'], $src['password'])) {
       @ session_start();
@@ -112,13 +112,13 @@ class Controller {
     @ session_start();
     session_destroy();
   }
-  
+
   protected function isGet() { return $_SERVER['REQUEST_METHOD'] == 'GET'; }
   protected function isPost() { return ($_SERVER['REQUEST_METHOD'] == 'POST' && @ !$_POST['_method']); }
   protected function isPut() { return (@ $_SERVER['REQUEST_METHOD'] == 'PUT' || @ $_POST['_method'] == 'put'); }
   protected function isDelete() { return (@ $_SERVER['REQUEST_METHOD'] == 'DELETE' || @ $_POST['_method'] == 'delete' ); }
   protected function isHead() { return (@ $_SERVER['REQUEST_METHOD'] == 'HEAD' || @ $_POST['_method'] == 'head'); }
-  
+
   protected function dispatchAction($path_segments) {
     $action = @ $path_segments[0]; //array_shift($path_segments);
     if( method_exists($this, $action) ) {
@@ -129,7 +129,7 @@ class Controller {
       $this->index($path_segments);
     }
   }
- 
+
   // Static methods
   private static $blacklisted_controllers = array();
 

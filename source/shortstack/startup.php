@@ -1,5 +1,7 @@
 <?php
-
+/**
+ * @ignore
+ */
 if(!isset($shortstack_config)) {
   $shortstack_config = array(
     'db' => array(
@@ -43,7 +45,7 @@ if( isset($shortstack_config) ) {
     }
   }
   if(@ $shortstack_config['db']['autoconnect'] ) {
-    DB::Connect( $shortstack_config['db']['engine'].":".$shortstack_config['db']['database'] ); 
+    DB::Connect( $shortstack_config['db']['engine'].":".$shortstack_config['db']['database'] );
   }
   if(@ $shortstack_config['db']['verify'] ) {
     DB::EnsureNotEmpty();

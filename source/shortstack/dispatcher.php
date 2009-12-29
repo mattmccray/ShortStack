@@ -18,12 +18,12 @@ class Dispatcher {
       global $shortstack_config;
       $controller = @$shortstack_config['controllers']['index']; // From settings instead?
       if(!$controller) $controller = 'home_controller'; // ?
-    } else { 
+    } else {
       $controller = $controller.'_controller';
     }
     return self::Dispatch($controller, $path_segments);
   }
-  
+
   static public function Dispatch($controller_name, $route_data=array()) {
     if (!self::$dispatched) {
       $controller = self::getControllerClass($controller_name);
@@ -58,10 +58,10 @@ class Dispatcher {
       }
     }
   }
-  
+
   static private function getControllerClass($controller_name) {
     $controller = underscore( $controller_name );
     if(! strpos($controller, 'ontroller') > 0) $controller .= "_controller";
     return camelize( $controller );
-  }  
+  }
 }

@@ -16,7 +16,17 @@ class NotFoundException extends Exception { }
 class DbException extends Exception { }
 class StaleCache extends Exception { }
 
+/**
+ * ShortStack
+ *
+ * Collects various, but global to the framework, methods.
+ *
+ */
 class ShortStack {
+  /**
+   * Returns path information based on the $className, used by the autoloader.
+   * @return string
+   */
   public static function AutoLoadFinder($className) {
     if(strpos($className, 'ontroller') > 0) {
       return self::ControllerPath( underscore($className) );
@@ -24,9 +34,14 @@ class ShortStack {
         return self::HelperPath( underscore($className) );
     } else { // Model
       return self::ModelPath( underscore($className) );
-    }    
+    }
   }
-  // Loads all models in the models/ folder and returns the model class names
+  /**
+   * Loads all models in the `models` folder and returns the model class names.
+   *
+   * @returns array
+   * @see Model
+   */
   public static function LoadAllModels() {
     $model_files = glob( self::ModelPath("*") );
     $classNames = array();
@@ -37,9 +52,12 @@ class ShortStack {
       require_once($filename);
       $classNames[] = camelize($className);
     }
-    return $classNames;    
+    return $classNames;
   }
-  // Create all the tables needs for the models and documentmodels...
+  /**
+   * Create all the tables needs for the models and documentmodels...
+   * @return array list of all models loaded (classnames)
+   */
   public static function InitializeDatabase() {
     $modelnames = ShortStack::LoadAllModels();
     foreach($modelnames as $modelName) {
@@ -50,7 +68,10 @@ class ShortStack {
     }
     return $modelnames;
   }
-  // File paths...
+  /**#@+
+    * File paths...
+    * @return string
+    */
   public static function ViewPath($path) {
     return self::GetPathFor('views', $path);
   }
@@ -70,5 +91,6 @@ class ShortStack {
     global $shortstack_config;
     return $shortstack_config[$type]['folder']."/".$path.$suffix;
   }
+  /**#@-*/
 }
 

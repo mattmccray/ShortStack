@@ -57,7 +57,10 @@ $shortstack_config = $config['shortstack'];
 
 
 try {
+  
+//  include_once('../dist/shortstack.php');
   include_once('../source/shortstack-dev.php');
+  
 } catch (EmptyDbException $e) {
 
   ShortStack::InitializeDatabase();
