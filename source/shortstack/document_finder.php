@@ -8,6 +8,8 @@
  * @todo DocumentFinder Todos
  *     - Implement OR logic
  *     - Cleanup loop logic for building SQL
+ *     - Add a 'fudge' factor for querying on non-indexed fields (will manually filter array)
+ *     - Same for 'order'
  *
  * @see Model, Document
  */
@@ -85,10 +87,13 @@ class DocumentFinder extends ModelFinder {
       }
       $sql .= join(' AND ', $finders);
     }
-    if($isCount) return $sql.";";
+    //if($isCount) return $sql.";"; // Seems to quadruple the count if I exit here...
 
     if(count($this->order) > 0) {
-      $sql .= " AND ";
+      if(count($all_finder_cols) > 0 || count($native_finder_cols) > 0)
+        $sql .= " AND ";
+      else
+        $sql .= " WHERE ";
       $sortJoins = array();
       $order_params = array();
       foreach ($this->order as $field => $dir) {

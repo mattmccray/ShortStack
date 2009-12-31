@@ -1,13 +1,13 @@
 # ShortStack
 
-A simple, easily customized, MVC framework for PHP. Currently built for use with PHP > 5, PDO, and SQLite.
+A simple, easily customized, MVC framework for PHP. Currently built for use with PHP 5.2ish, PDO, and SQLite.
 
 * DB Abstraction Layer (over PDO)
 * Models with `hasMany`/`belongsTo` (and `hasMany(through)`) relationships
 * `Document` Models (or schema-less models, loosely based on the [friendfeed][] design)
 * Controllers/Actions (hybrid)
 * Templates
-* Pager helper class
+* Pagination helper class
 * View Caching
 * Core Framework < 50kb in a single `.php` file
 

@@ -1,6 +1,6 @@
 <?php
 
-// ShortStack v0.9.6
+// ShortStack v0.9.7b3
 // By M@ McCray
 // (All comments have been stripped see:)
 // http://github.com/darthapo/ShortStack
@@ -13,13 +13,6 @@ function __autoload($className) {
     require_once($classPath);
   }
 }
-
-class Redirect extends Exception { }
-class FullRedirect extends Exception { }
-class EmptyDbException extends Exception { }
-class NotFoundException extends Exception { }
-class DbException extends Exception { }
-class StaleCache extends Exception { }
 class ShortStack {
   
   public static function AutoLoadFinder($className) {
@@ -38,7 +31,7 @@ class ShortStack {
     foreach($model_files as $filename) {
       $path = explode('/', $filename);
       $className = array_slice($path, -1);
-      $className = str_replace(".php", "", $className);
+      $className = str_replace(".php", "", $className[0]);
       require_once($filename);
       $classNames[] = camelize($className);
     }
@@ -54,6 +47,13 @@ class ShortStack {
       }
     }
     return $modelnames;
+  }
+  public static function IsDocument($className) {
+    if(!array_key_exists($className, self::$doctypeCache)) {
+      $mdl = new $className();
+      self::$doctypeCache[$className] = ($mdl instanceof Document) ? true : false;
+    }
+    return self::$doctypeCache[$className];
   }
   
   public static function ViewPath($path) {
@@ -76,13 +76,31 @@ class ShortStack {
     return $shortstack_config[$type]['folder']."/".$path.$suffix;
   }
   
+  
+  private static $doctypeCache = array();
 }
+
+class Redirect extends Exception { }
+class FullRedirect extends Exception { }
+class EmptyDbException extends Exception { }
+class NotFoundException extends Exception { }
+class DbException extends Exception { }
+class StaleCache extends Exception { }
+
 function url_for($controller) {
   return BASEURI . $controller;
 }
 
 function link_to($controller, $label, $className="") {
   return '<a href="'. url_for($controller) .'" class="'. $className .'">'. $label .'</a>';
+}
+
+function ends_with($test, $string) {
+  $strlen = strlen($string);
+  $testlen = strlen($test);
+  if ($testlen > $strlen) return false;
+  return substr_compare($string, $test, -$testlen) === 0;
+
 }
 
 function slugify($str) {
@@ -111,6 +129,73 @@ function camelize($str) {
 	return substr(str_replace(' ', '', $str), 1);
 }
 
+function plural($str, $force = FALSE) {
+	$str = strtolower(trim($str));
+	$end3 = substr($str, -3);
+	$end1 = substr($str, -1);
+	if ($end3 == 'eau') { $str .= 'x'; }
+	elseif ($end3 == 'man') { $str = substr($str, 0, -2).'en'; }
+	elseif (in_array($end3, array('dum', 'ium', 'lum'))) { $str = substr($str, 0, -2).'a'; }
+	elseif (strlen($str) > 4 && in_array($end3, array('bus', 'eus', 'gus', 'lus', 'mus', 'pus'))) { $str = substr($str, 0, -2).'i'; }
+	elseif ($end3 == 'ife') { $str = substr($str, 0, -2).'ves'; }
+	elseif ($end1 == 'f') { $str = substr($str, 0, -1).'ves'; }
+	elseif ($end1 == 'y') {	$str = substr($str, 0, -1).'ies';	}
+	elseif (in_array($end1, array('h', 'o', 'x'))) { $str .= 'es'; }
+	elseif ($end1 == 's') {	if ($force == TRUE)	{ $str .= 'es'; } }
+	else { $str .= 's'; }
+	return $str;
+}
+
+function singular($str) {
+	$str = strtolower(trim($str));
+	$end5 = substr($str, -5);
+	$end4 = substr($str, -4);
+	$end3 = substr($str, -3);
+	$end2 = substr($str, -2);
+	$end1 = substr($str, -1);
+	if ($end5 == 'eives') { $str = substr($str, 0, -3).'f'; }
+	elseif ($end4 == 'eaux') { $str = substr($str, 0, -1); }
+	elseif ($end4 == 'ives') { $str = substr($str, 0, -3).'fe'; }
+	elseif ($end3 == 'ves') { $str = substr($str, 0, -3).'f'; }
+	elseif ($end3 == 'ies') {	$str = substr($str, 0, -3).'y'; }
+	elseif ($end3 == 'men') {	$str = substr($str, 0, -2).'an'; }
+	elseif ($end3 == 'xes' && strlen($str) > 4 OR in_array($end3, array('ses', 'hes', 'oes'))) { $str = substr($str, 0, -2); }
+	elseif (in_array($end2, array('da', 'ia', 'la'))) { $str = substr($str, 0, -1).'um'; }
+	elseif (in_array($end2, array('bi', 'ei', 'gi', 'li', 'mi', 'pi'))) { $str = substr($str, 0, -1).'us'; }
+	else { if ($end1 == 's')	$str = substr($str, 0, -1); }
+	return $str;
+}
+
+function object_sort(&$data, $key) {
+  for ($i = count($data) - 1; $i >= 0; $i--) {
+    $swapped = false;
+    for ($j = 0; $j < $i; $j++){
+      if ($data[$j]->$key > $data[$j + 1]->$key) { 
+        $tmp = $data[$j];
+        $data[$j] = $data[$j + 1];        
+        $data[$j + 1] = $tmp;
+        $swapped = true;
+      }
+    }
+    if (!$swapped) return;
+  }
+}
+
+function object_sort_r(&$object, $key) { 
+  for ($i = count($object) - 1; $i >= 0; $i--) { 
+    $swapped = false; 
+    for ($j = 0; $j < $i; $j++) { 
+      if ($object[$j]->$key < $object[$j + 1]->$key) { 
+        $tmp = $object[$j]; 
+        $object[$j] = $object[$j + 1];       
+        $object[$j + 1] = $tmp; 
+        $swapped = true; 
+      } 
+    } 
+    if (!$swapped) return; 
+  } 
+}
+
 function use_helper($helper) {
   if(! strpos($helper, 'elper') > 0) $helper .= "_helper";
   require_once( ShortStack::HelperPath($helper) );
@@ -135,8 +220,10 @@ function mdl($objtype, $id=null) {
 }
 
 function get($modelName, $id=null) {
-  return ($modelName::$IsDocument) ? doc($modelName, $id) : mdl($modelName, $id);
+  return (ShortStack::IsDocument($modelName)) ? doc($modelName, $id) : mdl($modelName, $id);
+  
 }
+
 class Dispatcher {
   static public $dispatched = false;
   static public $current = null;
@@ -213,16 +300,21 @@ class Cache {
     $cacheContent = file_get_contents( ShortStack::CachePath($name) );
     $splitter = strpos($cacheContent, "\n");
     $contents = substr($cacheContent, $splitter+1, strlen($cacheContent) - $splitter);
-    $timeSinseCached = time() - intVal(substr($cacheContent, 0, $splitter));;
-    if($timeSinseCached > CACHELENGTH) {
-      Cache::Expire($name);
-      throw new StaleCache('Cache expired.');
+    if(CACHELENGTH > 0) {
+      $timeSinseCached = time() - intVal(substr($cacheContent, 0, $splitter));;
+      if($timeSinseCached > CACHELENGTH) {
+        Cache::Expire($name);
+        throw new StaleCache('Cache expired.');
+      } else {
+        return $contents;
+      }
     } else {
       return $contents;
     }
   }
   
   public static function Save($name, $content) {
+    if(!USECACHE || DEBUG) return true;
     $cacheContent = time() ."\n". $content;
     return file_put_contents( ShortStack::CachePath($name), $cacheContent);
   }
@@ -416,6 +508,7 @@ class DB {
 class Model {
   
   public $modelName = null;
+  public $errors = array();
   
   protected $data = false;
   protected $isNew = false;
@@ -429,7 +522,10 @@ class Model {
   protected $hasMany = array();
   
   protected $belongsTo = array();
-
+  
+  protected $validates = array();
+  
+  
   function __construct($dataRow=null) {
     $this->modelName = get_class($this);
     if($dataRow != null) {
@@ -474,23 +570,38 @@ class Model {
     $this->changedFields = $cleanChangedFields;
     return $results;
   }
+  
+  public function isValid() {
+    $this->errors = array();
+    return (count($this->errors) == 0);
+  }
 
   public function save() {
     $result = true;
     if($this->isDirty) {
+      
+      $this->beforeValidation();
+      $isValid = $this->isValid();
+      $this->afterValidation();
+      if(!$isValid) return false;
+      
       $this->beforeSave();
       if($this->isNew) { 
         $this->beforeCreate();
         $result = $this->_handleSqlInsert();
-        $this->afterCreate();
       }
       else { 
         $result = $this->_handleSqlUpdate();
       }
-      $this->changedFields = array();
-      $this->isDirty = false;
-      $this->isNew = false;
-      $this->afterSave();
+      if($result) {
+        $this->changedFields = array();
+        $this->isDirty = false;
+        if($this->isNew) {
+          $this->isNew = false;
+          $this->afterCreate();
+        }
+        $this->afterSave();
+      }
     }
     return $result;
   }
@@ -567,7 +678,7 @@ class Model {
     else if(array_key_exists('model', $def)) {
       $mdlClass = $def['model'];
       $fk = strtolower($this->modelName)."_id";
-      return Model::Find($mdlClass, $fk." = ".$this->id);
+      return Model::Find($mdlClass)->where($fk)->eq($this->id);
     }
     else if(array_key_exists('through', $def)) {
       $thruCls = $def['through'];
@@ -584,7 +695,7 @@ class Model {
     if(array_key_exists('document', $def)) {
       $mdlClass = $def['document'];
       $fk = strtolower($mdlClass)."_id";
-      return Document::Find($mdlClass)->where('id')->eq($this->$fk).get();
+      return Document::Find($mdlClass)->where('id')->eq($this->{$fk})->get();
     }
     else if(array_key_exists('model', $def)) {
       $mdlClass = $def['model'];
@@ -613,6 +724,7 @@ class Model {
     }
     else if($mode == 'set') {
       list($mdl) = $args;
+      $fk = strtolower($mdl->modelName)."_id";
       $this->{$fk} = $mdl->id;
     }
     else {
@@ -644,6 +756,7 @@ class Model {
       $triggerSQL = "CREATE TRIGGER generate_". $this->modelName ."_updated_on AFTER UPDATE ON ". $this->modelName ." BEGIN UPDATE ". $this->modelName ." SET updated_on = DATETIME('NOW') WHERE rowid = new.rowid; END;";
       if(DB::Query( $triggerSQL ) == false) $statement = false;
     }
+
     return ($statement != false);
   }
 
@@ -694,6 +807,8 @@ class Model {
     }
     return true;
   }
+  protected function beforeValidation() {}
+  protected function afterValidation() {}
   protected function beforeSave() {}
   protected function afterSave() {}
   protected function beforeCreate() {}
@@ -889,6 +1004,14 @@ class ModelFinder implements IteratorAggregate {
     return $this;
   }
   
+  public function build($props=array()) {
+    
+    $mdlCls = $this->objtype;
+    $mdl = new $mdlCls();
+    $mdl->update($props);
+    return $mdl;
+  }
+  
   public function _addFilter($column, $comparision, $value, $clause) {
     $this->__cache = false;
     $finder_filter = array('col'=>$column, 'comp'=>$comparision, 'val'=>$value);
@@ -928,7 +1051,7 @@ class ModelFinder implements IteratorAggregate {
       }
       $sql .= join(" AND ", $finders);
     }
-    if($isCount) return $sql.";";
+    
 
     if(count($this->order) > 0) {
       $sql .= " ORDER BY ";
@@ -1213,10 +1336,13 @@ class DocumentFinder extends ModelFinder {
       }
       $sql .= join(' AND ', $finders);
     }
-    if($isCount) return $sql.";";
+    
 
     if(count($this->order) > 0) {
-      $sql .= " AND ";
+      if(count($all_finder_cols) > 0 || count($native_finder_cols) > 0)
+        $sql .= " AND ";
+      else
+        $sql .= " WHERE ";
       $sortJoins = array();
       $order_params = array();
       foreach ($this->order as $field => $dir) {
@@ -1254,49 +1380,93 @@ class DocumentFinder extends ModelFinder {
 class Pager implements IteratorAggregate {
   protected $finder = null;
   public $pageSize = 10;
-  public $currentPage = 0;
+  public $currentPage = 1;
+  public $currentDataPage = 0;
   public $pages = 0;
+  public $pageKey;
+  public $baseUrl;
 
-  function __construct($finder, $pageSize=10, $params=array()) {
+  function __construct($finder, $params=array(), $rootUrl='/', $pageSize=10, $pageKey='page') {
     if($finder instanceof ModelFinder) {
       $this->finder = $finder;
-    } else if(is_string($finder)) {
+    } 
+    else if(is_string($finder)) {
       $this->finder = get($finder);
-    } else {
+    } 
+    else {
       throw new Exception("You must specify a model name or finder object.");
     }
+    if(ends_with('/', $rootUrl) )
+      $this->baseUrl = $rootUrl;
+    else
+      $this->baseUrl = $rootUrl.'/';
     $this->pageSize = $pageSize;
-    $this->pages = $this->count(); 
+    $this->pageKey = $pageKey;
     if(count($params) > 0) {
       $this->fromParams($params);
     }
+    $this->pages = $this->pageCount(); 
   }
 
   public function fromParams($params) {
     list($key, $page) = array_slice($params, -2);
-    if($key == 'page' && is_numeric($page))
+    if($key == $this->pageKey && is_numeric($page)) {
       $this->currentPage = intVal($page);
+      $this->currentDataPage = $this->currentPage - 1;
+    }
   }
 
   public function count() { 
-    $this->finder->limit(0)->offset(0);
-    $total = $this->finder->count();
-    return ceil( $total / $this->pageSize );
+    return $this->finder->limit(0)->offset(0)->count();
+  }
+
+  public function pageCount() { 
+    $total = $this->count();
+    return intVal(ceil( $total / $this->pageSize ));
   }
 
   public function items() {
-    $this->finder->limit($this->pagesize)->offset($this->currentPage);
+    $this->finder->limit($this->pageSize)->offset(($this->currentDataPage * $this->pageSize));
     return $this->finder->fetch();
   }
 
   public function getIterator() { 
-    return new ArrayIterator( $this->item() );
+    return new ArrayIterator( $this->items() );
+  }
+  
+  public function renderPager($className='pager', $currentClass='current', $inactiveClass='inactive', $toggleClass='toggle') {
+    $html = '<div class="'.$className.'">';
+    
+    $html .= '<a href="'.$this->baseUrl.'page/';
+    if($this->currentDataPage == 0) {
+      $html .=  '1" class="'.$inactiveClass.' '.$toggleClass;
+    } else {
+      $html .=  $this->currentDataPage.'" class="'.$toggleClass;
+    }
+    $html .='"><span>&laquo; Prev</span></a>';
+    
+    for ($i=1; $i <= $this->pages; $i++) { 
+      $html .= '<a href="'.$this->baseUrl.'page/'.$i.'"';
+      if($i == $this->currentPage)
+        $html .=' class="'.$currentClass.'"';
+      $html .='><span>'.$i.'</span></a>';
+    }
+    
+    $html .= '<a href="'.$this->baseUrl.'page/';
+    if($this->currentPage == $this->pages) {
+      $html .=  $this->currentPage.'" class="'.$inactiveClass.' '.$toggleClass;
+    } else {
+      $html .=  ($this->currentPage +1).'" class="'.$toggleClass;
+    }
+    $html .='"><span>Next &raquo;</span></a>';
+
+    return $html."</div>";
   }
 }
 
 class Template {
+  public $context;
   private $path;
-  private $context;
   private $silent;
   
   function __construct($templatePath, $vars=array(), $swallowErrors=true) {
@@ -1312,7 +1482,8 @@ class Template {
   function __get($key) {
     if(array_key_exists($key, $this->context)) {
       return $this->context[$key];
-    } else {
+    }
+    else {
       if($this->silent)
         return "";
       else
@@ -1320,11 +1491,29 @@ class Template {
     }
   }
 
-  function __call($name, $args) {
-    if($this->silent)
+  function __call($name, $args=array()) {
+    if($name == 'render') {
+      @list($view, $params) = $args;
+      if(strpos($view, '.php') < 1) $view .= ".php";
+      $tmp = new Template($view, $this->context);
+      $inlineContent = $tmp->fetch($params);
+      $this->context = $tmp->context; 
+      return $inlineContent;
+    }
+    else if(function_exists($name)) {
+      if(is_array($args)) {
+        return call_user_func_array($name, $args);
+      }
+      else {
+        return call_user_func($name, $args);
+      }
+    }
+    else if($this->silent) {
       return "";
-    else
+    }
+    else {
       throw new Exception("Method $name doesn't exist!!");
+    }
   }
 
   function assign($key, $value) {
@@ -1336,55 +1525,26 @@ class Template {
   }
 
   function fetch($params=array()) {
-
-    extract(array_merge($params, $this->context)); 
+    if(is_array($params))
+      $this->context = array_merge($this->context, $params);
     ob_start();
+    extract( $this->context, EXTR_PREFIX_INVALID, 'ss' ); 
     if (FORCESHORTTAGS) { 
       echo eval('?>'.preg_replace("/;*\s*\?>/", "; ?>", str_replace('<?=', '<?php echo ', file_get_contents($this->path))));
     } else {
-      include($this->path); 
+      include $this->path; 
     }
     $buffer = ob_get_contents();
     @ob_end_clean();
+
     return $buffer;
   }
 
 }
-if(!isset($shortstack_config)) {
-  $shortstack_config = array(
-    'db' => array(
-      'engine'   => 'sqlite', 
-      'database' => 'database.sqlite3',
-      'autoconnect' => true,
-      'verify' => true,
-    ),
-    'models' => array(
-      'folder' => 'models',
-    ),
-    'views' => array(
-      'folder' => 'views',
-      'force_short_tags'=>false,
-    ),
-    'controllers' => array(
-      'folder' => 'controllers',
-      'index' => 'home',
-      '404_handler'=>'home',
-    ),
-    'helpers' => array(
-      'folder' => 'helpers',
-      'autoload'=> array(),
-    ),
-    'cacheing' => array(
-      'folder' => 'caches',
-      'enabled' => true,
-      'expires' => 60*60, 
-    ),
-  );
-}
-
+global $shortstack_config;
 if( isset($shortstack_config) ) {
-  define('FORCESHORTTAGS', @$shortstack_config['views']['force_short_tags']);
-  define('USECACHE', @$shortstack_config['cacheing']['enabled']);
+  define('FORCESHORTTAGS', (@$shortstack_config['views']['force_short_tags'] == true) ? 1 : 0);
+  define('USECACHE', (@$shortstack_config['cacheing']['enabled'] == true) ? 1 : 0);
   define('CACHELENGTH', @$shortstack_config['cacheing']['expires']);
 
   if(@ is_array($shortstack_config['helpers']['autoload']) ) {

@@ -7,13 +7,20 @@ class TestOfDocument extends UnitTestCase {
   private $user;
   
   function setUp() {
-    $this->user = new User();
-    $this->user->update(array(
+    $this->user  = get('User')->build(array(
       'username'     => 'test',
       'password'     => 'pass',
       'display_name' => 'Test User'
     ));
     $this->user->save();
+    
+    // $this->user = new User();
+    // $this->user->update(array(
+    //   'username'     => 'test',
+    //   'password'     => 'pass',
+    //   'display_name' => 'Test User'
+    // ));
+    // $this->user->save();
     
     for ($i=0; $i < 6; $i++) { 
 //      $post = new Post();

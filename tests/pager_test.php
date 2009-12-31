@@ -30,21 +30,34 @@ class TestOfPager extends UnitTestCase {
 
     function tearDown() {
       doc('User')->destroy();
-      doc('Post')->destroy();
+    //  doc('Post')->destroy();
     }
 
   
   function testCount() {
     $pgr = new Pager('Post');
-    $this->assertEqual($pgr->count(), 3);
+    $this->assertEqual($pgr->count(), 25);
 
     $pgr = new Pager(doc('Post')->where('author')->neq('matt'));
     $this->assertEqual($pgr->count(), 0);
   }
   
+  function testPageCount() {
+    $pgr = new Pager(doc('Post'), array(), '/posts', 10);
+
+    $this->assertEqual($pgr->pageSize, 10);
+    $this->assertEqual($pgr->currentPage, 1);
+    $this->assertEqual($pgr->currentDataPage, 0);
+    $this->assertEqual($pgr->count(), 25);
+    $this->assertEqual($pgr->pageCount(), 3);
+    
+    debug($pgr->renderPager());
+    
+  }
+  
   function testParamParsing() {
-    $pgr = new Pager('Post', 10, array('posts', 'page', '2'));
-    $this->assertEqual($pgr->count(), 3);
+    $pgr = new Pager('Post', array('posts', 'page', '2'));
+    $this->assertEqual($pgr->count(), 25);
     $this->assertEqual($pgr->currentPage, 2);
   }
   

@@ -1,12 +1,15 @@
 <?php
 /**
  * Base class for all Database Models (ORM).
+ * @todo Model Todos
+ *     - belongsTo should memoize the associated model.
  */
 class Model {
   /**
    *  This is automatically set based on the Class name.
    */
   public $modelName = null;
+  public $errors = array();
   /**#@+
    * @ignore
    */
@@ -30,7 +33,14 @@ class Model {
    * If you want to associate this model to another, as belongsTo, override this property.
    */
   protected $belongsTo = array();
-
+  /**
+   * Override this and populate with the validations you want to occur before saving.
+   */
+  protected $validates = array();
+  
+  /**
+   *
+   */
   function __construct($dataRow=null) {
     $this->modelName = get_class($this);
     if($dataRow != null) {
@@ -75,23 +85,38 @@ class Model {
     $this->changedFields = $cleanChangedFields;
     return $results;
   }
+  
+  public function isValid() {
+    $this->errors = array();
+    return (count($this->errors) == 0);
+  }
 
   public function save() {
     $result = true;
     if($this->isDirty) {
+      // Validations
+      $this->beforeValidation();
+      $isValid = $this->isValid();
+      $this->afterValidation();
+      if(!$isValid) return false;
+      // Persistance
       $this->beforeSave();
       if($this->isNew) { // Create
         $this->beforeCreate();
         $result = $this->_handleSqlInsert();
-        $this->afterCreate();
       }
       else { // Update
         $result = $this->_handleSqlUpdate();
       }
-      $this->changedFields = array();
-      $this->isDirty = false;
-      $this->isNew = false;
-      $this->afterSave();
+      if($result) {
+        $this->changedFields = array();
+        $this->isDirty = false;
+        if($this->isNew) {
+          $this->isNew = false;
+          $this->afterCreate();
+        }
+        $this->afterSave();
+      }
     }
     return $result;
   }
@@ -172,7 +197,7 @@ class Model {
     else if(array_key_exists('model', $def)) {
       $mdlClass = $def['model'];
       $fk = strtolower($this->modelName)."_id";
-      return Model::Find($mdlClass, $fk." = ".$this->id);
+      return Model::Find($mdlClass)->where($fk)->eq($this->id);
     }
     else if(array_key_exists('through', $def)) {
       $thruCls = $def['through'];
@@ -189,7 +214,7 @@ class Model {
     if(array_key_exists('document', $def)) {
       $mdlClass = $def['document'];
       $fk = strtolower($mdlClass)."_id";
-      return Document::Find($mdlClass)->where('id')->eq($this->$fk).get();
+      return Document::Find($mdlClass)->where('id')->eq($this->{$fk})->get();
     }
     else if(array_key_exists('model', $def)) {
       $mdlClass = $def['model'];
@@ -218,6 +243,7 @@ class Model {
     }
     else if($mode == 'set') {
       list($mdl) = $args;
+      $fk = strtolower($mdl->modelName)."_id";
       $this->{$fk} = $mdl->id;
     }
     else {
@@ -249,6 +275,7 @@ class Model {
       $triggerSQL = "CREATE TRIGGER generate_". $this->modelName ."_updated_on AFTER UPDATE ON ". $this->modelName ." BEGIN UPDATE ". $this->modelName ." SET updated_on = DATETIME('NOW') WHERE rowid = new.rowid; END;";
       if(DB::Query( $triggerSQL ) == false) $statement = false;
     }
+//    if($statement == false) $this->errors[]= "SQL Error"; //.DB::GetLastError()[2]; // [2] ??
     return ($statement != false);
   }
 
@@ -302,6 +329,8 @@ class Model {
   /**#@-*/
 
   // Callbacks
+  protected function beforeValidation() {}
+  protected function afterValidation() {}
   protected function beforeSave() {}
   protected function afterSave() {}
   protected function beforeCreate() {}

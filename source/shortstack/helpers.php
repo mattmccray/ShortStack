@@ -1,11 +1,20 @@
 <?php
 
+
 function url_for($controller) {
   return BASEURI . $controller;
 }
 
 function link_to($controller, $label, $className="") {
   return '<a href="'. url_for($controller) .'" class="'. $className .'">'. $label .'</a>';
+}
+
+function ends_with($test, $string) {
+  $strlen = strlen($string);
+  $testlen = strlen($test);
+  if ($testlen > $strlen) return false;
+  return substr_compare($string, $test, -$testlen) === 0;
+//  return substr_compare($str, $test, -strlen($test), strlen($test)) == 0;
 }
 
 function slugify($str) {
@@ -36,6 +45,73 @@ function camelize($str) {
 	return substr(str_replace(' ', '', $str), 1);
 }
 
+function plural($str, $force = FALSE) {
+	$str = strtolower(trim($str));
+	$end3 = substr($str, -3);
+	$end1 = substr($str, -1);
+	if ($end3 == 'eau') { $str .= 'x'; }
+	elseif ($end3 == 'man') { $str = substr($str, 0, -2).'en'; }
+	elseif (in_array($end3, array('dum', 'ium', 'lum'))) { $str = substr($str, 0, -2).'a'; }
+	elseif (strlen($str) > 4 && in_array($end3, array('bus', 'eus', 'gus', 'lus', 'mus', 'pus'))) { $str = substr($str, 0, -2).'i'; }
+	elseif ($end3 == 'ife') { $str = substr($str, 0, -2).'ves'; }
+	elseif ($end1 == 'f') { $str = substr($str, 0, -1).'ves'; }
+	elseif ($end1 == 'y') {	$str = substr($str, 0, -1).'ies';	}
+	elseif (in_array($end1, array('h', 'o', 'x'))) { $str .= 'es'; }
+	elseif ($end1 == 's') {	if ($force == TRUE)	{ $str .= 'es'; } }
+	else { $str .= 's'; }
+	return $str;
+}
+
+function singular($str) {
+	$str = strtolower(trim($str));
+	$end5 = substr($str, -5);
+	$end4 = substr($str, -4);
+	$end3 = substr($str, -3);
+	$end2 = substr($str, -2);
+	$end1 = substr($str, -1);
+	if ($end5 == 'eives') { $str = substr($str, 0, -3).'f'; }
+	elseif ($end4 == 'eaux') { $str = substr($str, 0, -1); }
+	elseif ($end4 == 'ives') { $str = substr($str, 0, -3).'fe'; }
+	elseif ($end3 == 'ves') { $str = substr($str, 0, -3).'f'; }
+	elseif ($end3 == 'ies') {	$str = substr($str, 0, -3).'y'; }
+	elseif ($end3 == 'men') {	$str = substr($str, 0, -2).'an'; }
+	elseif ($end3 == 'xes' && strlen($str) > 4 OR in_array($end3, array('ses', 'hes', 'oes'))) { $str = substr($str, 0, -2); }
+	elseif (in_array($end2, array('da', 'ia', 'la'))) { $str = substr($str, 0, -1).'um'; }
+	elseif (in_array($end2, array('bi', 'ei', 'gi', 'li', 'mi', 'pi'))) { $str = substr($str, 0, -1).'us'; }
+	else { if ($end1 == 's')	$str = substr($str, 0, -1); }
+	return $str;
+}
+
+function object_sort(&$data, $key) {
+  for ($i = count($data) - 1; $i >= 0; $i--) {
+    $swapped = false;
+    for ($j = 0; $j < $i; $j++){
+      if ($data[$j]->$key > $data[$j + 1]->$key) { 
+        $tmp = $data[$j];
+        $data[$j] = $data[$j + 1];        
+        $data[$j + 1] = $tmp;
+        $swapped = true;
+      }
+    }
+    if (!$swapped) return;
+  }
+}
+
+function object_sort_r(&$object, $key) { 
+  for ($i = count($object) - 1; $i >= 0; $i--) { 
+    $swapped = false; 
+    for ($j = 0; $j < $i; $j++) { 
+      if ($object[$j]->$key < $object[$j + 1]->$key) { 
+        $tmp = $object[$j]; 
+        $object[$j] = $object[$j + 1];       
+        $object[$j + 1] = $tmp; 
+        $swapped = true; 
+      } 
+    } 
+    if (!$swapped) return; 
+  } 
+}
+
 function use_helper($helper) {
   if(! strpos($helper, 'elper') > 0) $helper .= "_helper";
   require_once( ShortStack::HelperPath($helper) );
@@ -62,6 +138,6 @@ function mdl($objtype, $id=null) {// For use with documents
 }
 
 function get($modelName, $id=null) {
-  return ($modelName::$IsDocument) ? doc($modelName, $id) : mdl($modelName, $id);
+  return (ShortStack::IsDocument($modelName)) ? doc($modelName, $id) : mdl($modelName, $id);
+  // return ($modelName::$IsDocument) ? doc($modelName, $id) : mdl($modelName, $id); // Only works in 5.3+
 }
-

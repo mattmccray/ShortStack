@@ -9,13 +9,6 @@ function __autoload($className) {
   }
 }
 
-class Redirect extends Exception { }
-class FullRedirect extends Exception { }
-class EmptyDbException extends Exception { }
-class NotFoundException extends Exception { }
-class DbException extends Exception { }
-class StaleCache extends Exception { }
-
 /**
  * ShortStack
  *
@@ -48,7 +41,7 @@ class ShortStack {
     foreach($model_files as $filename) {
       $path = explode('/', $filename);
       $className = array_slice($path, -1);
-      $className = str_replace(".php", "", $className);
+      $className = str_replace(".php", "", $className[0]);
       require_once($filename);
       $classNames[] = camelize($className);
     }
@@ -67,6 +60,13 @@ class ShortStack {
       }
     }
     return $modelnames;
+  }
+  public static function IsDocument($className) {
+    if(!array_key_exists($className, self::$doctypeCache)) {
+      $mdl = new $className();
+      self::$doctypeCache[$className] = ($mdl instanceof Document) ? true : false;
+    }
+    return self::$doctypeCache[$className];
   }
   /**#@+
     * File paths...
@@ -92,5 +92,16 @@ class ShortStack {
     return $shortstack_config[$type]['folder']."/".$path.$suffix;
   }
   /**#@-*/
+  /**
+   * @ignore
+   */
+  private static $doctypeCache = array();
 }
+
+class Redirect extends Exception { }
+class FullRedirect extends Exception { }
+class EmptyDbException extends Exception { }
+class NotFoundException extends Exception { }
+class DbException extends Exception { }
+class StaleCache extends Exception { }
 

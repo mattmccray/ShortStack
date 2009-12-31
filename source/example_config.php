@@ -27,7 +27,7 @@ $shortstack_config = array(
     'autoload'=> array('link', 'navigation'),
   ),
   'cacheing' => array(
-    'folder' => 'caches',
+    'folder' => 'app/data/cache',
     'enabled' => true,
     'expires' => 60*60, // In Seconds (60*60 == 1h)
   ),

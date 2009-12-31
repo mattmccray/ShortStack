@@ -18,10 +18,14 @@ class Cache {
     $cacheContent = file_get_contents( ShortStack::CachePath($name) );
     $splitter = strpos($cacheContent, "\n");
     $contents = substr($cacheContent, $splitter+1, strlen($cacheContent) - $splitter);
-    $timeSinseCached = time() - intVal(substr($cacheContent, 0, $splitter));;
-    if($timeSinseCached > CACHELENGTH) {
-      Cache::Expire($name);
-      throw new StaleCache('Cache expired.');
+    if(CACHELENGTH > 0) {
+      $timeSinseCached = time() - intVal(substr($cacheContent, 0, $splitter));;
+      if($timeSinseCached > CACHELENGTH) {
+        Cache::Expire($name);
+        throw new StaleCache('Cache expired.');
+      } else {
+        return $contents;
+      }
     } else {
       return $contents;
     }
@@ -30,6 +34,7 @@ class Cache {
    *  @return bool
    */
   public static function Save($name, $content) {
+    if(!USECACHE || DEBUG) return true;
     $cacheContent = time() ."\n". $content;
     return file_put_contents( ShortStack::CachePath($name), $cacheContent);
   }

@@ -6,6 +6,7 @@
  *
  * @todo ModelFinder Todos
  *     - Implement OR logic
+ *     - Update order() to overwrite the order on every call (and support variable param)
  *
  * @see Model, Document
  */
@@ -173,6 +174,17 @@ class ModelFinder implements IteratorAggregate {
   }
   /**
    * @ignore
+   * @internal Undocumented Feature...
+   */
+  public function build($props=array()) {
+    // TODO: Should [Finder]->create($props) set and initial data from where eq calls?
+    $mdlCls = $this->objtype;
+    $mdl = new $mdlCls();
+    $mdl->update($props);
+    return $mdl;
+  }
+  /**
+   * @ignore
    * @internal Used to by FinderMatcher only.
    */
   public function _addFilter($column, $comparision, $value, $clause) {
@@ -220,7 +232,7 @@ class ModelFinder implements IteratorAggregate {
       }
       $sql .= join(" AND ", $finders);
     }
-    if($isCount) return $sql.";";
+    //if($isCount) return $sql.";"; // Seems to quadruple the count if I exit here...
 
     if(count($this->order) > 0) {
       $sql .= " ORDER BY ";

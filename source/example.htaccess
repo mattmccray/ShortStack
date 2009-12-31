@@ -1,22 +1,21 @@
 Options -Indexes
 
-php_flag display_errors on
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /
 
-# Turn on URL rewriting
-RewriteEngine On
+    RewriteRule ^(.git|Rakefile|app) - [F,L]
+  
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
 
-# Installation directory
-RewriteBase /
+    RewriteRule ^(.*)$ index.php?$1 [L]
+</IfModule>
 
-# Protect application files from being viewed
-RewriteRule ^(.git|application) - [F,L]
+<IfModule !mod_rewrite.c>
+    # If we don't have mod_rewrite installed, all 404's
+    # can be sent to index.php, and everything works as normal.
+    # Submitted by: ElliotHaughin to CodeIgniter...
 
-# Don't want template file evaluated directly in browser
-RewriteRule ^themes/(.*).php - [F,L]
-
-# Allow any files or directories that exist to be displayed directly
-RewriteCond %{REQUEST_FILENAME} !-f
-RewriteCond %{REQUEST_FILENAME} !-d
-
-# Rewrite all other URLs to index.php/URL
-RewriteRule ^(.*)$ /index.php?$1 [PT,L]
+    ErrorDocument 404 /index.php
+</IfModule>
