@@ -20,7 +20,7 @@ class Controller {
   function render($view, $params=array(), $wrapInLayout=null) {
     $tmpl = new Template( ShortStack::ViewPath($view) );
     $content = $tmpl->fetch($params);
-    $this->renderText($content, $params, $wrapInLayout);
+    $this->renderText($content, $tmpl->context, $wrapInLayout);
   }
 
   function renderText($text, $params=array(), $wrapInLayout=null) {
@@ -89,6 +89,13 @@ class Controller {
         throw new Redirect($this->sessionController);
       }
     }
+  }
+  
+  public function currentUsername() {
+    if($this->isLoggedIn())
+      return $_SESSION['CURRENT_USER'];
+    else
+      return null;
   }
 
   protected function isLoggedIn() {

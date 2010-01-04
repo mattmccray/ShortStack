@@ -47,6 +47,14 @@ class Document extends Model {
     }
     return $results;
   }
+  
+  public function isValid() {
+    if(!$this->data) $this->_deserialize();
+    $this->beforeValidation();
+    $result = validate($this->data, $this->validates, $this->errors);
+    $this->afterValidation();
+    return $result;
+  }
 
   public function reindex() {
     $wasSuccessful = true;
@@ -66,6 +74,7 @@ class Document extends Model {
       'created_on'=>$this->created_on,
       'updated_on'=>$this->updated_on,
     );
+    if(!$this->data) $this->_deserialize();
     foreach($this->data as $col=>$value) {
       if(!in_array($col, $exclude)) {
         $attrs[$col] = $this->$col;
@@ -80,7 +89,7 @@ class Document extends Model {
 
   function __get($key) {
     if(!$this->data) { $this->_deserialize(); }
-    return $this->data[$key];
+    return @$this->data[$key];
   }
 
   function __set($key, $value) {

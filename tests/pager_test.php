@@ -51,7 +51,7 @@ class TestOfPager extends UnitTestCase {
     $this->assertEqual($pgr->count(), 25);
     $this->assertEqual($pgr->pageCount(), 3);
     
-    debug($pgr->renderPager());
+//    debug($pgr->renderPager());
     
   }
   

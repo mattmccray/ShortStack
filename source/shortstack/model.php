@@ -87,17 +87,17 @@ class Model {
   }
   
   public function isValid() {
-    $this->errors = array();
-    return (count($this->errors) == 0);
+    $this->beforeValidation();
+    $result = validate($this->data, $this->validates, $this->errors);
+    $this->afterValidation();
+    return $result;
   }
 
   public function save() {
     $result = true;
     if($this->isDirty) {
       // Validations
-      $this->beforeValidation();
       $isValid = $this->isValid();
-      $this->afterValidation();
       if(!$isValid) return false;
       // Persistance
       $this->beforeSave();
@@ -158,7 +158,7 @@ class Model {
    */
   function __get($key) {
     if($this->data) {
-      return html_entity_decode($this->data[$key], ENT_QUOTES );
+      return html_entity_decode(@$this->data[$key], ENT_QUOTES );
     }
   }
 

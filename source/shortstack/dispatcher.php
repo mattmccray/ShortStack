@@ -27,11 +27,10 @@ class Dispatcher {
   static public function Dispatch($controller_name, $route_data=array()) {
     if (!self::$dispatched) {
       $controller = self::getControllerClass($controller_name);
-      self::$current = $controller;
       try {
         if(!Controller::IsAllowed($controller_name)) throw new NotFoundException();
-        $ctrl = new $controller();
-        $ctrl->execute($route_data);
+        self::$current = new $controller();
+        self::$current->execute($route_data);
         self::$dispatched = true;
       }
       catch( NotFoundException $e ) {

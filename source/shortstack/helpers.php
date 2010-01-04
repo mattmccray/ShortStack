@@ -9,6 +9,21 @@ function link_to($controller, $label, $className="") {
   return '<a href="'. url_for($controller) .'" class="'. $className .'">'. $label .'</a>';
 }
 
+function select_box($name, $options, $default=null, $className='') {
+  $html = "<select id=\"$name\" name=\"$name\" class=\"$className\">";
+  foreach ($options as $value => $text) {
+    $html .="<option value=\"$value\" ".(($value == $default) ? ' selected' : '').">$text</option>";
+  }
+  return $html."</select>";
+}
+function to_options($mdlArr, $textField='title', $keyField='id') {
+  $opts = array();
+  foreach ($mdlArr as $mdl) {
+    $opts[$mdl->{$keyField}] = $mdl->{$textField};
+  }
+  return $opts;
+}
+
 function ends_with($test, $string) {
   $strlen = strlen($string);
   $testlen = strlen($test);
@@ -140,4 +155,69 @@ function mdl($objtype, $id=null) {// For use with documents
 function get($modelName, $id=null) {
   return (ShortStack::IsDocument($modelName)) ? doc($modelName, $id) : mdl($modelName, $id);
   // return ($modelName::$IsDocument) ? doc($modelName, $id) : mdl($modelName, $id); // Only works in 5.3+
+}
+
+// Validation support
+function validate($src, $ruleset, &$err) {
+  $err = array();
+  foreach ($ruleset as $field => $rulesrc) {
+    $rules = explode('|', $rulesrc);
+    foreach ($rules as $testfunc) {
+      $args = explode(':', $testfunc);
+      $func = array_shift($args);
+      if(function_exists('validator_'.$func)) {
+        @array_unshift($args, $src[$field]);
+        if(!call_user_func_array('validator_'.$func, $args)) {
+          if(!array_key_exists($field, $err)) $err[$field] = array();
+          $err[$field][] = $func;
+        }
+      }
+      else if(function_exists($func)) {
+        @array_unshift($args, $src[$field]);
+        if(!call_user_func_array($func, $args)) {
+          if(!array_key_exists($field, $err)) $err[$field] = array();
+          $err[$field][] = $func;
+        }
+      }
+      else {
+        if(!array_key_exists($field, $err)) $err[$field] = array();
+        throw new Exception("Validator $testfunc not found.");
+//        $err[$field][] = $testfunc." <- Validator not found";
+      }
+    }
+  }
+  return (count($err) == 0);
+}
+
+function validator_required($value) {
+  return (isset($value) && $value != null && $value != "" && $value != " " );
+}
+
+function validator_numeric($value) {
+  if(isset($value)) {
+    return is_numeric($value);
+  }
+  else {
+    return true;
+  }
+}
+
+function validator_contains() {
+  $args = func_get_args();
+  $value = array_shift($args);
+  if(isset($value)) {
+    return in_array($value, $args);
+  }
+  else {
+    return true;
+  }
+}
+
+function validator_email($value) {
+  if(isset($value)) {
+    return preg_match("/^[_a-z0-9-]+(\.[_a-z0-9-]+)*@[a-z0-9-]+(\.[a-z0-9-]+)*(\.[a-z]{2,3})$/", $value);
+  }
+  else {
+    return true;
+  }
 }

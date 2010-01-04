@@ -59,7 +59,7 @@ class DocumentFinder extends ModelFinder {
     }
     // Also for OR?
 
-    $tables = array_merge(array($this->objtype), $all_order_cols);
+    $tables = array_unique(array_merge(array($this->objtype), $all_order_cols));
     //TODO: Should it select the id, data, and datetime(created_on, 'localtime')???
     if($isCount)
       $sql = "SELECT count(". $this->objtype .".id) as count FROM ". join(', ', $tables) ." ";
@@ -68,12 +68,17 @@ class DocumentFinder extends ModelFinder {
 
     if(count($all_finder_cols) > 0) {
       $sql .= "WHERE ". $this->objtype .".id IN (";
-      $sql .= "SELECT ". $all_finder_cols[0] .".docid FROM ". join(', ', $all_finder_cols). " ";
+      $sql .= "SELECT ". $all_finder_cols[0] .".docid FROM ". join(', ', array_unique($all_finder_cols)). " ";
       $sql .= " WHERE ";
       $finders = array();
-      foreach($this->finder as $qry) {
-        if(!in_array($qry['col'], $this->nativeFields))
+      foreach($this->finder as $idx => $qry) {
+        if(!in_array($qry['col'], $this->nativeFields)) {
           $finders []= " ". $this->_getIdxCol($qry['col'])  ." ". $qry['comp'] .' "'. htmlentities($qry['val'], ENT_QUOTES) .'" ';
+          // Fix for where'ing on mulitple columns... ??
+          if($idx > 0 && $all_finder_cols[0] != $this->_getIdxCol($qry['col'], false))
+            $finders []= $all_finder_cols[0] .".docid = ".$this->_getIdxCol($qry['col'], false).".docid";
+          
+        }
       }
       $sql .= join(' AND ', $finders);
       $sql .= ") ";
@@ -116,7 +121,7 @@ class DocumentFinder extends ModelFinder {
       $sql .= " OFFSET ". $this->offset ." ";
     }
     $sql .= ";";
-//    print_r($sql);
+//    print_r($sql); echo "\n";
     return $sql;
   }
 

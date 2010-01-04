@@ -1,6 +1,6 @@
 <?php
 
-// ShortStack v0.9.7b3
+// ShortStack v0.9.7b4
 // By M@ McCray
 // (All comments have been stripped see:)
 // http://github.com/darthapo/ShortStack
@@ -93,6 +93,21 @@ function url_for($controller) {
 
 function link_to($controller, $label, $className="") {
   return '<a href="'. url_for($controller) .'" class="'. $className .'">'. $label .'</a>';
+}
+
+function select_box($name, $options, $default=null, $className='') {
+  $html = "<select id=\"$name\" name=\"$name\" class=\"$className\">";
+  foreach ($options as $value => $text) {
+    $html .="<option value=\"$value\" ".(($value == $default) ? ' selected' : '').">$text</option>";
+  }
+  return $html."</select>";
+}
+function to_options($mdlArr, $textField='title', $keyField='id') {
+  $opts = array();
+  foreach ($mdlArr as $mdl) {
+    $opts[$mdl->{$keyField}] = $mdl->{$textField};
+  }
+  return $opts;
 }
 
 function ends_with($test, $string) {
@@ -223,7 +238,69 @@ function get($modelName, $id=null) {
   return (ShortStack::IsDocument($modelName)) ? doc($modelName, $id) : mdl($modelName, $id);
   
 }
+function validate($src, $ruleset, &$err) {
+  $err = array();
+  foreach ($ruleset as $field => $rulesrc) {
+    $rules = explode('|', $rulesrc);
+    foreach ($rules as $testfunc) {
+      $args = explode(':', $testfunc);
+      $func = array_shift($args);
+      if(function_exists('validator_'.$func)) {
+        @array_unshift($args, $src[$field]);
+        if(!call_user_func_array('validator_'.$func, $args)) {
+          if(!array_key_exists($field, $err)) $err[$field] = array();
+          $err[$field][] = $func;
+        }
+      }
+      else if(function_exists($func)) {
+        @array_unshift($args, $src[$field]);
+        if(!call_user_func_array($func, $args)) {
+          if(!array_key_exists($field, $err)) $err[$field] = array();
+          $err[$field][] = $func;
+        }
+      }
+      else {
+        if(!array_key_exists($field, $err)) $err[$field] = array();
+        throw new Exception("Validator $testfunc not found.");
 
+      }
+    }
+  }
+  return (count($err) == 0);
+}
+
+function validator_required($value) {
+  return (isset($value) && $value != null && $value != "" && $value != " " );
+}
+
+function validator_numeric($value) {
+  if(isset($value)) {
+    return is_numeric($value);
+  }
+  else {
+    return true;
+  }
+}
+
+function validator_contains() {
+  $args = func_get_args();
+  $value = array_shift($args);
+  if(isset($value)) {
+    return in_array($value, $args);
+  }
+  else {
+    return true;
+  }
+}
+
+function validator_email($value) {
+  if(isset($value)) {
+    return preg_match("/^[_a-z0-9-]+(\.[_a-z0-9-]+)*@[a-z0-9-]+(\.[a-z0-9-]+)*(\.[a-z]{2,3})$/", $value);
+  }
+  else {
+    return true;
+  }
+}
 class Dispatcher {
   static public $dispatched = false;
   static public $current = null;
@@ -251,11 +328,10 @@ class Dispatcher {
   static public function Dispatch($controller_name, $route_data=array()) {
     if (!self::$dispatched) {
       $controller = self::getControllerClass($controller_name);
-      self::$current = $controller;
       try {
         if(!Controller::IsAllowed($controller_name)) throw new NotFoundException();
-        $ctrl = new $controller();
-        $ctrl->execute($route_data);
+        self::$current = new $controller();
+        self::$current->execute($route_data);
         self::$dispatched = true;
       }
       catch( NotFoundException $e ) {
@@ -349,7 +425,7 @@ class Controller {
   function render($view, $params=array(), $wrapInLayout=null) {
     $tmpl = new Template( ShortStack::ViewPath($view) );
     $content = $tmpl->fetch($params);
-    $this->renderText($content, $params, $wrapInLayout);
+    $this->renderText($content, $tmpl->context, $wrapInLayout);
   }
 
   function renderText($text, $params=array(), $wrapInLayout=null) {
@@ -416,6 +492,13 @@ class Controller {
         throw new Redirect($this->sessionController);
       }
     }
+  }
+  
+  public function currentUsername() {
+    if($this->isLoggedIn())
+      return $_SESSION['CURRENT_USER'];
+    else
+      return null;
   }
 
   protected function isLoggedIn() {
@@ -572,17 +655,17 @@ class Model {
   }
   
   public function isValid() {
-    $this->errors = array();
-    return (count($this->errors) == 0);
+    $this->beforeValidation();
+    $result = validate($this->data, $this->validates, $this->errors);
+    $this->afterValidation();
+    return $result;
   }
 
   public function save() {
     $result = true;
     if($this->isDirty) {
       
-      $this->beforeValidation();
       $isValid = $this->isValid();
-      $this->afterValidation();
       if(!$isValid) return false;
       
       $this->beforeSave();
@@ -639,7 +722,7 @@ class Model {
   }
   function __get($key) {
     if($this->data) {
-      return html_entity_decode($this->data[$key], ENT_QUOTES );
+      return html_entity_decode(@$this->data[$key], ENT_QUOTES );
     }
   }
 
@@ -1158,6 +1241,14 @@ class Document extends Model {
     }
     return $results;
   }
+  
+  public function isValid() {
+    if(!$this->data) $this->_deserialize();
+    $this->beforeValidation();
+    $result = validate($this->data, $this->validates, $this->errors);
+    $this->afterValidation();
+    return $result;
+  }
 
   public function reindex() {
     $wasSuccessful = true;
@@ -1177,6 +1268,7 @@ class Document extends Model {
       'created_on'=>$this->created_on,
       'updated_on'=>$this->updated_on,
     );
+    if(!$this->data) $this->_deserialize();
     foreach($this->data as $col=>$value) {
       if(!in_array($col, $exclude)) {
         $attrs[$col] = $this->$col;
@@ -1186,7 +1278,7 @@ class Document extends Model {
   }
   function __get($key) {
     if(!$this->data) { $this->_deserialize(); }
-    return $this->data[$key];
+    return @$this->data[$key];
   }
 
   function __set($key, $value) {
@@ -1308,7 +1400,7 @@ class DocumentFinder extends ModelFinder {
     }
     
 
-    $tables = array_merge(array($this->objtype), $all_order_cols);
+    $tables = array_unique(array_merge(array($this->objtype), $all_order_cols));
     
     if($isCount)
       $sql = "SELECT count(". $this->objtype .".id) as count FROM ". join(', ', $tables) ." ";
@@ -1317,12 +1409,17 @@ class DocumentFinder extends ModelFinder {
 
     if(count($all_finder_cols) > 0) {
       $sql .= "WHERE ". $this->objtype .".id IN (";
-      $sql .= "SELECT ". $all_finder_cols[0] .".docid FROM ". join(', ', $all_finder_cols). " ";
+      $sql .= "SELECT ". $all_finder_cols[0] .".docid FROM ". join(', ', array_unique($all_finder_cols)). " ";
       $sql .= " WHERE ";
       $finders = array();
-      foreach($this->finder as $qry) {
-        if(!in_array($qry['col'], $this->nativeFields))
+      foreach($this->finder as $idx => $qry) {
+        if(!in_array($qry['col'], $this->nativeFields)) {
           $finders []= " ". $this->_getIdxCol($qry['col'])  ." ". $qry['comp'] .' "'. htmlentities($qry['val'], ENT_QUOTES) .'" ';
+          
+          if($idx > 0 && $all_finder_cols[0] != $this->_getIdxCol($qry['col'], false))
+            $finders []= $all_finder_cols[0] .".docid = ".$this->_getIdxCol($qry['col'], false).".docid";
+          
+        }
       }
       $sql .= join(' AND ', $finders);
       $sql .= ") ";
