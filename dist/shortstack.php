@@ -1,6 +1,6 @@
 <?php
 
-// ShortStack v0.9.7b4
+// ShortStack v0.9.7b5
 // By M@ McCray
 // (All comments have been stripped see:)
 // http://github.com/darthapo/ShortStack
@@ -86,6 +86,31 @@ class EmptyDbException extends Exception { }
 class NotFoundException extends Exception { }
 class DbException extends Exception { }
 class StaleCache extends Exception { }
+function h($content) {
+  return htmlentities($content);
+}
+
+function display_errors($allErrors, $error_msgs=array()) {
+  $msgs = array_merge($error_msgs, array(
+    'required' => ' is required.',
+    'email' => ' must be a valid email address.',
+    'numeric' => ' must be a number.',
+    'contain' => ' has an invalid value.',
+    'contains' => ' has an invalid value.',
+  ));
+  $html = "<fieldset class=\"errors\"><legend>Errors</legend><p>Sorry, the following errors were encountered while trying to process your request:</p>";
+  $html .="<dl>";
+  foreach ($allErrors as $field => $errors) {
+    # code...
+    $html .= "<dt>$field</dt><dd><ul>";
+    foreach ($errors as $error) {
+      $errMsg = (array_key_exists($error, $msgs)) ? $msgs[$error] : $error;
+      $html .= "<li class=\"$error\">".$errMsg."</li>";
+    }
+    $html .= "</ul></dd>";
+  }
+  return $html."</dl></fieldset>";
+}
 
 function url_for($controller) {
   return BASEURI . $controller;
@@ -407,13 +432,44 @@ class Cache {
     return true;
   }
 }
+
+class Flash implements ArrayAccess {
+  public $now = array();
+  public function __construct($key = "_FLASH_DATA_") {
+  	$this->key = $key;
+  	@session_start();
+  	$this->now = isset($_SESSION[$this->key]) ? $_SESSION[$this->key] : array();
+  }
+  public function offsetSet($offset, $value) {
+    $_SESSION[$this->key][$offset] = $value;
+  }
+  public function offsetExists($offset) {
+    return isset($this->now[$offset]);
+  }
+  public function offsetUnset($offset) {
+    unset($this->now[$offset]);
+    unset($_SESSION[$this->key][$offset]);
+  }
+  public function offsetGet($offset) {
+    $_SESSION[$this->key] = array(); 
+    return isset($this->now[$offset]) ? $this->now[$offset] : null;
+  }
+}
 class Controller {
   protected $defaultLayout = "_layout";
   protected $cacheName = false;
   protected $cacheOutput = true;
+  
+  function __get($key) {
+    if($key == 'flash') {
+      if(!$this->__flash) $this->__flash = new Flash();
+      return $this->__flash;
+    }
+    return null;
+  }
   function execute($args=array()) {
     $this->cacheName = get_class($this)."-".join('_', $args);
-    if(@ $this->secure) $this->ensureLoggedIn();
+    if(@ $this->secure) $this->requiresLogin();
     $this->_preferCached();
     $this->dispatchAction($args);
   }
@@ -484,7 +540,8 @@ class Controller {
     }
   }
 
-  protected function ensureLoggedIn($useHTTP=false) {
+  protected function requiresLogin($useHTTP=false) {
+    $this->cacheOutput = false;
     if (!$this->isLoggedIn()) {
       if($useHTTP) {
         $this->_handleHttpAuth();
@@ -492,6 +549,10 @@ class Controller {
         throw new Redirect($this->sessionController);
       }
     }
+  }
+  
+  protected function ensureLoggedIn($useHTTP=false) {
+    $this->requiresLogin();
   }
   
   public function currentUsername() {

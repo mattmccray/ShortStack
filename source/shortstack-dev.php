@@ -5,6 +5,7 @@ require_once('shortstack/helpers.php');
 require_once('shortstack/cache.php');
 require_once('shortstack/dispatcher.php');
 require_once('shortstack/controller.php');
+require_once('shortstack/flash.php');
 require_once('shortstack/db.php');
 require_once('shortstack/model.php');
 require_once('shortstack/model_joiner.php');

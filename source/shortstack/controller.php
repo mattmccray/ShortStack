@@ -4,11 +4,19 @@ class Controller {
   protected $defaultLayout = "_layout";
   protected $cacheName = false;
   protected $cacheOutput = true;
+  
+  function __get($key) {
+    if($key == 'flash') {
+      if(!$this->__flash) $this->__flash = new Flash();
+      return $this->__flash;
+    }
+    return null;
+  }
 
   // Default execute method... Feel free to override.
   function execute($args=array()) {
     $this->cacheName = get_class($this)."-".join('_', $args);
-    if(@ $this->secure) $this->ensureLoggedIn();
+    if(@ $this->secure) $this->requiresLogin();
     $this->_preferCached();
     $this->dispatchAction($args);
   }
@@ -81,7 +89,8 @@ class Controller {
     }
   }
 
-  protected function ensureLoggedIn($useHTTP=false) {
+  protected function requiresLogin($useHTTP=false) {
+    $this->cacheOutput = false;
     if (!$this->isLoggedIn()) {
       if($useHTTP) {
         $this->_handleHttpAuth();
@@ -89,6 +98,12 @@ class Controller {
         throw new Redirect($this->sessionController);
       }
     }
+  }
+  /**
+   * @deprecated
+   */
+  protected function ensureLoggedIn($useHTTP=false) {
+    $this->requiresLogin();
   }
   
   public function currentUsername() {

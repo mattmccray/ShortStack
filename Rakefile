@@ -3,7 +3,7 @@ desc "Compile the source into dist/shortstack.php"
 task :compile do
   compiled_src = "<?php\n"
   
-  %w(VERSION core helpers dispatcher cache controller db model model_joiner model_finder finder_matcher document document_finder pager template startup).each do |src_file|
+  %w(VERSION core helpers dispatcher cache flash controller db model model_joiner model_finder finder_matcher document document_finder pager template startup).each do |src_file|
     frag_src = IO.readlines("source/shortstack/#{src_file}.php")
     frag_src.shift # Remove the '<?php' heading...
     if src_file != 'VERSION'

@@ -1,5 +1,30 @@
 <?php
 
+function h($content) {
+  return htmlentities($content);
+}
+
+function display_errors($allErrors, $error_msgs=array()) {
+  $msgs = array_merge($error_msgs, array(
+    'required' => ' is required.',
+    'email' => ' must be a valid email address.',
+    'numeric' => ' must be a number.',
+    'contain' => ' has an invalid value.',
+    'contains' => ' has an invalid value.',
+  ));
+  $html = "<fieldset class=\"errors\"><legend>Errors</legend><p>Sorry, the following errors were encountered while trying to process your request:</p>";
+  $html .="<dl>";
+  foreach ($allErrors as $field => $errors) {
+    # code...
+    $html .= "<dt>$field</dt><dd><ul>";
+    foreach ($errors as $error) {
+      $errMsg = (array_key_exists($error, $msgs)) ? $msgs[$error] : $error;
+      $html .= "<li class=\"$error\">".$errMsg."</li>";
+    }
+    $html .= "</ul></dd>";
+  }
+  return $html."</dl></fieldset>";
+}
 
 function url_for($controller) {
   return BASEURI . $controller;
