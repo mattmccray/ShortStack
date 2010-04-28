@@ -2,8 +2,10 @@
 
 class DB {
   static protected $pdo;
+  static public $connectionString;
 
   static public function Connect($conn, $user="", $pass="", $options=array()) {
+    self::$connectionString = $conn;
     self::$pdo = new PDO($conn, $user, $pass, $options);
     return self::$pdo;
   }

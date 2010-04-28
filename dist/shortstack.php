@@ -1,10 +1,11 @@
 <?php
 
-// ShortStack v0.9.7b5
+// ShortStack v0.9.7b6
 // By M@ McCray
 // (All comments have been stripped see:)
 // http://github.com/darthapo/ShortStack
 
+define("SHORTSTACK_VERSION", "0.9.7b6");
 function __autoload($className) {
   $classPath = ShortStack::AutoLoadFinder($className);
   if(!file_exists($classPath)) {
@@ -75,6 +76,7 @@ class ShortStack {
     global $shortstack_config;
     return $shortstack_config[$type]['folder']."/".$path.$suffix;
   }
+  public static $VERSION = "";
   
   
   private static $doctypeCache = array();
@@ -614,8 +616,10 @@ class Controller {
 }
 class DB {
   static protected $pdo;
+  static public $connectionString;
 
   static public function Connect($conn, $user="", $pass="", $options=array()) {
+    self::$connectionString = $conn;
     self::$pdo = new PDO($conn, $user, $pass, $options);
     return self::$pdo;
   }

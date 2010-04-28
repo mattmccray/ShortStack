@@ -91,6 +91,7 @@ class ShortStack {
     global $shortstack_config;
     return $shortstack_config[$type]['folder']."/".$path.$suffix;
   }
+  public static $VERSION = "";
   /**#@-*/
   /**
    * @ignore
