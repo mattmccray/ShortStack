@@ -109,13 +109,13 @@ class Model {
         $result = $this->_handleSqlUpdate();
       }
       if($result) {
-        $this->changedFields = array();
-        $this->isDirty = false;
         if($this->isNew) {
           $this->isNew = false;
           $this->afterCreate();
         }
         $this->afterSave();
+        $this->changedFields = array();
+        $this->isDirty = false;
       }
     }
     return $result;
@@ -158,13 +158,16 @@ class Model {
    */
   function __get($key) {
     if($this->data) {
-      return html_entity_decode(@$this->data[$key], ENT_QUOTES );
+      return @$this->data[$key];
     }
+//    return NULL;
   }
 
   function __set($key, $value) {
-    $value = stripslashes($value);
-    if(@ $this->data[$key] != htmlentities($value, ENT_QUOTES)) {
+    if(is_string($value)) {
+      $value = htmlentities(stripslashes($value), ENT_QUOTES);
+    } 
+    if(@ $this->data[$key] != $value) {
       $this->data[$key] = $value;
       $this->changedFields[] = $key;
       $this->isDirty = true;

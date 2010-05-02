@@ -27,17 +27,17 @@ class Pager implements IteratorAggregate {
       $this->baseUrl = $rootUrl.'/';
     $this->pageSize = $pageSize;
     $this->pageKey = $pageKey;
-    if(count($params) > 0) {
-      $this->fromParams($params);
-    }
+    $this->fromParams($params);
     $this->pages = $this->pageCount(); // ???
   }
 
-  public function fromParams($params) {
-    list($key, $page) = array_slice($params, -2);
-    if($key == $this->pageKey && is_numeric($page)) {
-      $this->currentPage = intVal($page);
-      $this->currentDataPage = $this->currentPage - 1;
+  public function fromParams($params=array()) {
+    if(count($params) >= 2) {
+      list($key, $page) = array_slice($params, -2);
+      if($key == $this->pageKey && is_numeric($page)) {
+        $this->currentPage = intVal($page);
+        $this->currentDataPage = $this->currentPage - 1;
+      }
     }
   }
 

@@ -24,7 +24,7 @@ class Document extends Model {
     if($dataRow != null) {
       $this->rawData = $dataRow['data'];
       $this->data = false;
-      $this->id = $dataRow['id'];
+      $this->id = (int)$dataRow['id'];
       $this->created_on = $dataRow['created_on'];
       $this->updated_on = $dataRow['updated_on'];
     } else {
@@ -94,7 +94,9 @@ class Document extends Model {
 
   function __set($key, $value) {
     if(!$this->data) { $this->_deserialize(); }
-    $value = stripslashes($value);
+    if(is_string($value)) {
+      $value = stripslashes($value);
+    } 
     if(@ $this->data[$key] != $value) {
       $this->data[$key] = $value;
       $this->changedFields[] = $key;
@@ -119,7 +121,7 @@ class Document extends Model {
     $statement = DB::Query($sql);
     if($statement == false) return false;
     $result = DB::Query('SELECT last_insert_rowid() as last_insert_rowid')->fetch(); // Get the record's generated ID...
-    $this->id = $result['last_insert_rowid'];
+    $this->id = (int)$result['last_insert_rowid'];
     $this->reindex();
     return true;
   }
@@ -155,8 +157,24 @@ class Document extends Model {
   private function _deserialize() { // Used internally only... Triggers callbacks.
     $this->beforeDeserialize();
     $this->data = $this->deserialize( html_entity_decode($this->rawData, ENT_QUOTES) );
+    $this->_massageDataTypes();
     $this->afterDeserialize(); // ??: Should the results be passed in to allow massaging?
     return $this;
+  }
+  
+  private function _massageDataTypes() {
+    if($this->data) {
+      foreach($this->data as $col=>$value) {
+        if( is_numeric($value) ) {
+          if( stripos($value, ".") ) {
+             $value = floatval($value); // ??
+          } else {
+            $value = intval($value);
+          }
+          $this->data[$col] = $value;
+        }
+      }
+    }
   }
 
   /**#@-*/

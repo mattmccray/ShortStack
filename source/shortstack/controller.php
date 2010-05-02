@@ -103,7 +103,7 @@ class Controller {
    * @deprecated
    */
   protected function ensureLoggedIn($useHTTP=false) {
-    $this->requiresLogin();
+    $this->requiresLogin($useHTTP);
   }
   
   public function currentUsername() {

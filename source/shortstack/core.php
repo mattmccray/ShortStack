@@ -16,6 +16,7 @@ function __autoload($className) {
  *
  */
 class ShortStack {
+  public static $Version = SHORTSTACK_VERSION;
   /**
    * Returns path information based on the $className, used by the autoloader.
    * @return string

@@ -1,11 +1,11 @@
 <?php
 
-// ShortStack v0.9.7b6
+// ShortStack v0.9.8
 // By M@ McCray
 // (All comments have been stripped see:)
 // http://github.com/darthapo/ShortStack
 
-define("SHORTSTACK_VERSION", "0.9.7b6");
+define("SHORTSTACK_VERSION", "0.9.8");
 function __autoload($className) {
   $classPath = ShortStack::AutoLoadFinder($className);
   if(!file_exists($classPath)) {
@@ -15,6 +15,7 @@ function __autoload($className) {
   }
 }
 class ShortStack {
+  public static $Version = SHORTSTACK_VERSION;
   
   public static function AutoLoadFinder($className) {
     if(strpos($className, 'ontroller') > 0) {
@@ -171,7 +172,7 @@ function camelize($str) {
 	return substr(str_replace(' ', '', $str), 1);
 }
 
-function plural($str, $force = FALSE) {
+function pluralize($str, $force = FALSE) {
 	$str = strtolower(trim($str));
 	$end3 = substr($str, -3);
 	$end1 = substr($str, -1);
@@ -188,7 +189,7 @@ function plural($str, $force = FALSE) {
 	return $str;
 }
 
-function singular($str) {
+function singularize($str) {
 	$str = strtolower(trim($str));
 	$end5 = substr($str, -5);
 	$end4 = substr($str, -4);
@@ -245,6 +246,15 @@ function use_helper($helper) {
 
 function getBaseUri() { 
 	return str_replace("/".$_SERVER['QUERY_STRING'], "/", array_shift(explode("?", $_SERVER['REQUEST_URI'])));
+}
+
+function getQueryString() { 
+  $path_segs = explode("?", $_SERVER['REQUEST_URI']);
+  $uri = array_shift($path_segs);
+  $qs = array_shift($path_segs);
+  $args = array();
+  parse_str($qs, $args);
+  return $args;
 }
 
 function debug($obj) {
@@ -554,7 +564,7 @@ class Controller {
   }
   
   protected function ensureLoggedIn($useHTTP=false) {
-    $this->requiresLogin();
+    $this->requiresLogin($useHTTP);
   }
   
   public function currentUsername() {
@@ -742,13 +752,13 @@ class Model {
         $result = $this->_handleSqlUpdate();
       }
       if($result) {
-        $this->changedFields = array();
-        $this->isDirty = false;
         if($this->isNew) {
           $this->isNew = false;
           $this->afterCreate();
         }
         $this->afterSave();
+        $this->changedFields = array();
+        $this->isDirty = false;
       }
     }
     return $result;
@@ -787,13 +797,16 @@ class Model {
   }
   function __get($key) {
     if($this->data) {
-      return html_entity_decode(@$this->data[$key], ENT_QUOTES );
+      return @$this->data[$key];
     }
+
   }
 
   function __set($key, $value) {
-    $value = stripslashes($value);
-    if(@ $this->data[$key] != htmlentities($value, ENT_QUOTES)) {
+    if(is_string($value)) {
+      $value = htmlentities(stripslashes($value), ENT_QUOTES);
+    } 
+    if(@ $this->data[$key] != $value) {
       $this->data[$key] = $value;
       $this->changedFields[] = $key;
       $this->isDirty = true;
@@ -1130,6 +1143,15 @@ class ModelFinder implements IteratorAggregate {
     return $stmt->fetchAll();
   }
   
+  public function to_sql() {
+    return $this->_buildSQL();
+  }
+  
+  public function to_json($ignoreCache=false) {
+    return Model::toJSON( $this->fetch($ignoreCache) );
+  }
+  
+  
   public function getIterator() { 
     $docs = $this->_execQuery();
     return new ArrayIterator($docs);
@@ -1283,7 +1305,7 @@ class Document extends Model {
     if($dataRow != null) {
       $this->rawData = $dataRow['data'];
       $this->data = false;
-      $this->id = $dataRow['id'];
+      $this->id = (int)$dataRow['id'];
       $this->created_on = $dataRow['created_on'];
       $this->updated_on = $dataRow['updated_on'];
     } else {
@@ -1348,7 +1370,9 @@ class Document extends Model {
 
   function __set($key, $value) {
     if(!$this->data) { $this->_deserialize(); }
-    $value = stripslashes($value);
+    if(is_string($value)) {
+      $value = stripslashes($value);
+    } 
     if(@ $this->data[$key] != $value) {
       $this->data[$key] = $value;
       $this->changedFields[] = $key;
@@ -1373,7 +1397,7 @@ class Document extends Model {
     $statement = DB::Query($sql);
     if($statement == false) return false;
     $result = DB::Query('SELECT last_insert_rowid() as last_insert_rowid')->fetch(); 
-    $this->id = $result['last_insert_rowid'];
+    $this->id = (int)$result['last_insert_rowid'];
     $this->reindex();
     return true;
   }
@@ -1409,8 +1433,24 @@ class Document extends Model {
   private function _deserialize() { 
     $this->beforeDeserialize();
     $this->data = $this->deserialize( html_entity_decode($this->rawData, ENT_QUOTES) );
+    $this->_massageDataTypes();
     $this->afterDeserialize(); 
     return $this;
+  }
+  
+  private function _massageDataTypes() {
+    if($this->data) {
+      foreach($this->data as $col=>$value) {
+        if( is_numeric($value) ) {
+          if( stripos($value, ".") ) {
+             $value = floatval($value); 
+          } else {
+            $value = intval($value);
+          }
+          $this->data[$col] = $value;
+        }
+      }
+    }
   }
   protected function beforeDeserialize() {}
   protected function afterDeserialize() {}
@@ -1501,10 +1541,7 @@ class DocumentFinder extends ModelFinder {
     
 
     if(count($this->order) > 0) {
-      if(count($all_finder_cols) > 0 || count($native_finder_cols) > 0)
-        $sql .= " AND ";
-      else
-        $sql .= " WHERE ";
+
       $sortJoins = array();
       $order_params = array();
       foreach ($this->order as $field => $dir) {
@@ -1515,6 +1552,16 @@ class DocumentFinder extends ModelFinder {
           $order_params[]= $this->objtype .".". $field ." ". $dir;
         }
       }
+
+      if(count($sortJoins) > 0) {
+        if(count($all_finder_cols) > 0 || count($native_finder_cols) > 0) {
+          $sql .= " AND ";
+        }
+        else {
+          $sql .= " WHERE ";
+        }
+      }
+
       $sql .= join(" AND ", $sortJoins);
       $sql .= " ORDER BY ";
       $sql .= join(", ", $order_params);
@@ -1564,17 +1611,17 @@ class Pager implements IteratorAggregate {
       $this->baseUrl = $rootUrl.'/';
     $this->pageSize = $pageSize;
     $this->pageKey = $pageKey;
-    if(count($params) > 0) {
-      $this->fromParams($params);
-    }
+    $this->fromParams($params);
     $this->pages = $this->pageCount(); 
   }
 
-  public function fromParams($params) {
-    list($key, $page) = array_slice($params, -2);
-    if($key == $this->pageKey && is_numeric($page)) {
-      $this->currentPage = intVal($page);
-      $this->currentDataPage = $this->currentPage - 1;
+  public function fromParams($params=array()) {
+    if(count($params) >= 2) {
+      list($key, $page) = array_slice($params, -2);
+      if($key == $this->pageKey && is_numeric($page)) {
+        $this->currentPage = intVal($page);
+        $this->currentDataPage = $this->currentPage - 1;
+      }
     }
   }
 

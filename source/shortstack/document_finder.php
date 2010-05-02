@@ -95,10 +95,7 @@ class DocumentFinder extends ModelFinder {
     //if($isCount) return $sql.";"; // Seems to quadruple the count if I exit here...
 
     if(count($this->order) > 0) {
-      if(count($all_finder_cols) > 0 || count($native_finder_cols) > 0)
-        $sql .= " AND ";
-      else
-        $sql .= " WHERE ";
+
       $sortJoins = array();
       $order_params = array();
       foreach ($this->order as $field => $dir) {
@@ -109,6 +106,16 @@ class DocumentFinder extends ModelFinder {
           $order_params[]= $this->objtype .".". $field ." ". $dir;
         }
       }
+
+      if(count($sortJoins) > 0) {
+        if(count($all_finder_cols) > 0 || count($native_finder_cols) > 0) {
+          $sql .= " AND ";
+        }
+        else {
+          $sql .= " WHERE ";
+        }
+      }
+
       $sql .= join(" AND ", $sortJoins);
       $sql .= " ORDER BY ";
       $sql .= join(", ", $order_params);

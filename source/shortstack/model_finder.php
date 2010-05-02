@@ -130,6 +130,21 @@ class ModelFinder implements IteratorAggregate {
     return $stmt->fetchAll();
   }
   /**
+   * @ignore
+   * @internal Returns generates SQL for the finder.
+   */
+  public function to_sql() {
+    return $this->_buildSQL();
+  }
+  /**
+   * @ignore
+   * @internal Turns results of find into json.
+   */
+  public function to_json($ignoreCache=false) {
+    return Model::toJSON( $this->fetch($ignoreCache) );
+  }
+  
+  /**
    * Allows for direct use of Finder in an array-like fashion. (foreach)
    *
    * @returns ArrayIterator

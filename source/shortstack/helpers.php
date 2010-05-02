@@ -85,7 +85,7 @@ function camelize($str) {
 	return substr(str_replace(' ', '', $str), 1);
 }
 
-function plural($str, $force = FALSE) {
+function pluralize($str, $force = FALSE) {
 	$str = strtolower(trim($str));
 	$end3 = substr($str, -3);
 	$end1 = substr($str, -1);
@@ -102,7 +102,7 @@ function plural($str, $force = FALSE) {
 	return $str;
 }
 
-function singular($str) {
+function singularize($str) {
 	$str = strtolower(trim($str));
 	$end5 = substr($str, -5);
 	$end4 = substr($str, -4);
@@ -161,6 +161,15 @@ function use_helper($helper) {
  */
 function getBaseUri() { // Used by the Dispatcher
 	return str_replace("/".$_SERVER['QUERY_STRING'], "/", array_shift(explode("?", $_SERVER['REQUEST_URI'])));
+}
+
+function getQueryString() { // Used by the Dispatcher
+  $path_segs = explode("?", $_SERVER['REQUEST_URI']);
+  $uri = array_shift($path_segs);
+  $qs = array_shift($path_segs);
+  $args = array();
+  parse_str($qs, $args);
+  return $args;
 }
 
 function debug($obj) {
