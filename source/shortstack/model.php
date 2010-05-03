@@ -366,19 +366,19 @@ class Model {
     return @(integer)$results[0]['count'];
   }
 
-  static public function toJSON($obj) {
+  static public function toJSON($obj, $excludes=array()) {
     if(is_array($obj)) {
       $data = array();
       foreach($obj as $idx=>$mdl) {
         if($mdl instanceof Model)
-          $data[] = $mdl->to_array();
+          $data[] = $mdl->to_array($excludes);
         else
           $data[$idx] = $mdl;
       }
       return json_encode($data);
 
     } else if( $obj instanceof Model ) {
-      return json_encode($obj->to_array());
+      return json_encode($obj->to_array($excludes));
 
     } else {
       return json_encode($obj);

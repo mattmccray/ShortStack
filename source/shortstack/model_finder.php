@@ -140,8 +140,8 @@ class ModelFinder implements IteratorAggregate {
    * @ignore
    * @internal Turns results of find into json.
    */
-  public function to_json($ignoreCache=false) {
-    return Model::toJSON( $this->fetch($ignoreCache) );
+  public function to_json($ignoreCache=false, $exclude=array()) {
+    return Model::toJSON( $this->fetch($ignoreCache), $exclude );
   }
   
   /**
