@@ -627,6 +627,7 @@ class Controller {
 class DB {
   static protected $pdo;
   static public $connectionString;
+  static public $lastSQL;
 
   static public function Connect($conn, $user="", $pass="", $options=array()) {
     self::$connectionString = $conn;
@@ -635,6 +636,7 @@ class DB {
   }
 
   static public function Query($sql_string) {
+    self::$lastSQL = $sql_string;
     return self::$pdo->query($sql_string);
   }
 
@@ -720,7 +722,8 @@ class Model {
     $cleanChangedFields = array();
     $results = array();
     foreach($this->changedFields as $fieldname) {
-      if(in_array($fieldname, $valid_atts)) { 
+      if(in_array($fieldname, $valid_atts) && !in_array($fieldname, $cleanChangedFields)) { 
+        
         $results[$fieldname] = '"'.htmlentities($this->$fieldname, ENT_QUOTES).'"';
         $cleanChangedFields[] = $fieldname;
       }
@@ -795,18 +798,33 @@ class Model {
   public function createTableForModel() {
     return $this->_handleSqlCreate();
   }
+  
+  
+  public function blastUpdate($values=array()){
+    $result = true;
+    foreach($values as $key=>$value) {
+      $this->$key = $value;
+    }
+    if($this->isNew) { 
+      $result = $this->_handleSqlInsert();
+    }
+    else { 
+      $result = $this->_handleSqlUpdate();
+    }
+    $this->changedFields = array();
+    $this->isDirty = false;
+    return $result;
+  }
   function __get($key) {
     if($this->data) {
-      return @$this->data[$key];
+      return html_entity_decode(@$this->data[$key], ENT_QUOTES );
     }
 
   }
 
   function __set($key, $value) {
-    if(is_string($value)) {
-      $value = htmlentities(stripslashes($value), ENT_QUOTES);
-    } 
-    if(@ $this->data[$key] != $value) {
+    $value = stripslashes($value);
+    if(@ $this->data[$key] != htmlentities($value, ENT_QUOTES)) {
       $this->data[$key] = $value;
       $this->changedFields[] = $key;
       $this->isDirty = true;

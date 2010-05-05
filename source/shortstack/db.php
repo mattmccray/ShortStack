@@ -3,6 +3,7 @@
 class DB {
   static protected $pdo;
   static public $connectionString;
+  static public $lastSQL;
 
   static public function Connect($conn, $user="", $pass="", $options=array()) {
     self::$connectionString = $conn;
@@ -11,6 +12,7 @@ class DB {
   }
 
   static public function Query($sql_string) {
+    self::$lastSQL = $sql_string;
     return self::$pdo->query($sql_string);
   }
 

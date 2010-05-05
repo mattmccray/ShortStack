@@ -77,7 +77,8 @@ class Model {
     $cleanChangedFields = array();
     $results = array();
     foreach($this->changedFields as $fieldname) {
-      if(in_array($fieldname, $valid_atts)) { // Stringifies everything, is this really ideal?
+      if(in_array($fieldname, $valid_atts) && !in_array($fieldname, $cleanChangedFields)) { 
+        // Stringifies everything, is this really ideal? TODO: Only stringify if is_string()
         $results[$fieldname] = '"'.htmlentities($this->$fieldname, ENT_QUOTES).'"';
         $cleanChangedFields[] = $fieldname;
       }
@@ -152,22 +153,39 @@ class Model {
   public function createTableForModel() {
     return $this->_handleSqlCreate();
   }
+  
+  /**#@+
+   * @ignore  Kinda dangerous
+   */
+  public function blastUpdate($values=array()){
+    $result = true;
+    foreach($values as $key=>$value) {
+      $this->$key = $value;
+    }
+    if($this->isNew) { // Create
+      $result = $this->_handleSqlInsert();
+    }
+    else { // Update
+      $result = $this->_handleSqlUpdate();
+    }
+    $this->changedFields = array();
+    $this->isDirty = false;
+    return $result;
+  }
 
   /**#@+
    * @ignore
    */
   function __get($key) {
     if($this->data) {
-      return @$this->data[$key];
+      return html_entity_decode(@$this->data[$key], ENT_QUOTES );
     }
 //    return NULL;
   }
 
   function __set($key, $value) {
-    if(is_string($value)) {
-      $value = htmlentities(stripslashes($value), ENT_QUOTES);
-    } 
-    if(@ $this->data[$key] != $value) {
+    $value = stripslashes($value);
+    if(@ $this->data[$key] != htmlentities($value, ENT_QUOTES)) {
       $this->data[$key] = $value;
       $this->changedFields[] = $key;
       $this->isDirty = true;
