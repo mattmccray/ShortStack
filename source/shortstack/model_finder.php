@@ -219,7 +219,7 @@ class ModelFinder implements IteratorAggregate {
     $stmt = DB::Query($sql);
     $items = array();
     if($stmt) {
-      $results = $stmt->fetchAll();
+      $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
       $className = $this->objtype;
       foreach ($results as $rowdata) {
         $items[] = new $className($rowdata);

@@ -20,10 +20,11 @@ class DB {
     return self::$pdo->errorInfo();
   }
 
-  static public function FetchAll($sql_string) {
+  static public function FetchAll($sql_string, $fetch_type=null) {
     $statement = self::Query($sql_string);
+    if($fetch_type == null) $fetch_type = PDO::FETCH_ASSOC;
     if($statement != false) {
-      return $statement->fetchAll(); // PDO::FETCH_GROUP
+      return $statement->fetchAll($fetch_type); // PDO::FETCH_GROUP
     } else {
       $err = self::GetLastError();
       throw new DbException("Error:\n\t".$err[2]."\nWas thrown by SQL:\n\t".$sql_string);

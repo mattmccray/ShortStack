@@ -597,7 +597,7 @@ class Controller {
   }
 
   protected function isGet() { return $_SERVER['REQUEST_METHOD'] == 'GET'; }
-  protected function isPost() { return ($_SERVER['REQUEST_METHOD'] == 'POST' && @ !$_POST['_method']); }
+  protected function isPost() { return ($_SERVER['REQUEST_METHOD'] == 'POST' && @ (!$_POST['_method'] || $_POST['_method'] == 'post')); }
   protected function isPut() { return (@ $_SERVER['REQUEST_METHOD'] == 'PUT' || @ $_POST['_method'] == 'put'); }
   protected function isDelete() { return (@ $_SERVER['REQUEST_METHOD'] == 'DELETE' || @ $_POST['_method'] == 'delete' ); }
   protected function isHead() { return (@ $_SERVER['REQUEST_METHOD'] == 'HEAD' || @ $_POST['_method'] == 'head'); }
@@ -644,10 +644,11 @@ class DB {
     return self::$pdo->errorInfo();
   }
 
-  static public function FetchAll($sql_string) {
+  static public function FetchAll($sql_string, $fetch_type=null) {
     $statement = self::Query($sql_string);
+    if($fetch_type == null) $fetch_type = PDO::FETCH_ASSOC;
     if($statement != false) {
-      return $statement->fetchAll(); 
+      return $statement->fetchAll($fetch_type); 
     } else {
       $err = self::GetLastError();
       throw new DbException("Error:\n\t".$err[2]."\nWas thrown by SQL:\n\t".$sql_string);
@@ -1214,7 +1215,7 @@ class ModelFinder implements IteratorAggregate {
     $stmt = DB::Query($sql);
     $items = array();
     if($stmt) {
-      $results = $stmt->fetchAll();
+      $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
       $className = $this->objtype;
       foreach ($results as $rowdata) {
         $items[] = new $className($rowdata);

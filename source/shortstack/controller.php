@@ -136,7 +136,7 @@ class Controller {
   }
 
   protected function isGet() { return $_SERVER['REQUEST_METHOD'] == 'GET'; }
-  protected function isPost() { return ($_SERVER['REQUEST_METHOD'] == 'POST' && @ !$_POST['_method']); }
+  protected function isPost() { return ($_SERVER['REQUEST_METHOD'] == 'POST' && @ (!$_POST['_method'] || $_POST['_method'] == 'post')); }
   protected function isPut() { return (@ $_SERVER['REQUEST_METHOD'] == 'PUT' || @ $_POST['_method'] == 'put'); }
   protected function isDelete() { return (@ $_SERVER['REQUEST_METHOD'] == 'DELETE' || @ $_POST['_method'] == 'delete' ); }
   protected function isHead() { return (@ $_SERVER['REQUEST_METHOD'] == 'HEAD' || @ $_POST['_method'] == 'head'); }
