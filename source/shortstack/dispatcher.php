@@ -12,6 +12,10 @@ class Dispatcher {
     $uri = @  '/'.$_SERVER['QUERY_STRING']; //@ $_SERVER['PATH_INFO']; // was REQUEST_URI
     $path_segments = array_filter(explode('/', $uri), create_function('$var', 'return ($var != null && $var != "");'));
     $controller = array_shift($path_segments);
+    if(stripos($controller, '.') >= 0) {
+      $path_parts = explode('.', $controller);
+      $controller = $path_parts[0]; 
+    }
     // override is mainly only used for an 'install' controller... I'd imagine.
     if($override_controller != false) $controller = $override_controller;
     if($controller == '') {

@@ -1,11 +1,11 @@
 <?php
 
-// ShortStack v0.9.8
+// ShortStack v0.9.9
 // By M@ McCray
 // (All comments have been stripped see:)
 // http://github.com/darthapo/ShortStack
 
-define("SHORTSTACK_VERSION", "0.9.8");
+define("SHORTSTACK_VERSION", "0.9.9");
 function __autoload($className) {
   if(stripos($className, '.') >= 0) {
     $path_parts = explode('.', $className);
@@ -354,6 +354,10 @@ class Dispatcher {
     $uri = @  '/'.$_SERVER['QUERY_STRING']; 
     $path_segments = array_filter(explode('/', $uri), create_function('$var', 'return ($var != null && $var != "");'));
     $controller = array_shift($path_segments);
+    if(stripos($controller, '.') >= 0) {
+      $path_parts = explode('.', $controller);
+      $controller = $path_parts[0]; 
+    }
     
     if($override_controller != false) $controller = $override_controller;
     if($controller == '') {
