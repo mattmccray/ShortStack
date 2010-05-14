@@ -12,7 +12,7 @@ function display_errors($allErrors, $error_msgs=array()) {
     'contain' => ' has an invalid value.',
     'contains' => ' has an invalid value.',
   ));
-  $html = "<fieldset class=\"errors\"><legend>Errors</legend><p>Sorry, the following errors were encountered while trying to process your request:</p>";
+  $html = "<fieldset class=\"errors\"><legend>Errors</legend><div class=\"body\"><p>Sorry, the following errors were encountered while trying to process your request:</p>";
   $html .="<dl>";
   foreach ($allErrors as $field => $errors) {
     # code...
@@ -23,7 +23,7 @@ function display_errors($allErrors, $error_msgs=array()) {
     }
     $html .= "</ul></dd>";
   }
-  return $html."</dl></fieldset>";
+  return $html."</dl></div></fieldset>";
 }
 
 function url_for($controller) {
