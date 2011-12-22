@@ -104,7 +104,7 @@ Bulk Destroy Posts -- Kinda dangerous:
 
     doc('Post')->where('author')->neq('M@')->destroy();
 
-
+> The ORM can be used without the rest of the stack by include shortstack_orm.php instead of shortstack.php (both under dist/).
 
 ## Todos
 

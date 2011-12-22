@@ -1,5 +1,6 @@
 <?php
 
+require_once('shortstack/autoload.php');
 require_once('shortstack/core.php');
 require_once('shortstack/helpers.php');
 require_once('shortstack/cache.php');
